@@ -306,6 +306,9 @@ fi
 
 cd "$SRC_DIR"
 
+# Stale debian/control from a cached work tree can still list soup3 packages.
+rm -f debian/control
+
 # Ensure PATH/ccache still exported for the package build.
 export PATH="/usr/lib/ccache:${PATH}"
 export CCACHE_DIR
