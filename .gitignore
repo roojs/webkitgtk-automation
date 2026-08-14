@@ -1,0 +1,10 @@
+/work/
+/cache/
+/.ci-cache/
+/dist/*.deb
+*.deb
+*.ddeb
+*.buildinfo
+*.changes
+*~
+.DS_Store

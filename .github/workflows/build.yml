@@ -1,0 +1,198 @@
+name: Build libwebkitgtk-6.0 with WebDriver
+
+on:
+  workflow_dispatch:
+    inputs:
+      suffix:
+        description: Debian version suffix appended to the Ubuntu package version
+        required: true
+        default: "+webkitgtk1"
+        type: string
+      clean:
+        description: Wipe work tree before building (ignore restored work cache)
+        required: false
+        default: false
+        type: boolean
+      clean_cache:
+        description: Also wipe persistent ccache
+        required: false
+        default: false
+        type: boolean
+      refresh_apt_cache:
+        description: Force a fresh apt archive cache key (re-download packages)
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+env:
+  APT_CACHE_DIR: .ci-cache/apt
+  WORK_CACHE_DIR: .ci-cache/work
+  # Native build on the runner image — must match runs-on.
+  SERIES: noble
+
+jobs:
+  build:
+    # Prefer a large/self-hosted runner if available. Hosted runners persist
+    # apt + ccache + packed work/ (build-gtk4) when under the cache size budget.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Free runner disk (remove unused SDKs)
+        run: |
+          chmod +x .github/scripts/free-runner-disk.sh .github/scripts/work-cache.sh
+          .github/scripts/free-runner-disk.sh
+
+      - name: Restore apt package cache
+        id: restore-apt
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.APT_CACHE_DIR }}
+          key: apt-webkitgtk-v1-${{ inputs.refresh_apt_cache && github.run_id || 'stable' }}-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', 'build.sh') }}
+          restore-keys: |
+            apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-
+            apt-webkitgtk-v1-stable-${{ env.SERIES }}-
+            apt-webkitgtk-v1-
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        id: restore-ccache
+        with:
+          path: cache/ccache
+          key: ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-
+            ccache-${{ env.SERIES }}-${{ runner.arch }}-
+            ccache-${{ env.SERIES }}-
+
+      - name: Restore work tree cache (incremental build)
+        id: restore-work
+        if: ${{ !inputs.clean }}
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.WORK_CACHE_DIR }}
+          key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ inputs.suffix }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-${{ github.run_id }}
+          restore-keys: |
+            work-${{ env.SERIES }}-${{ runner.arch }}-${{ inputs.suffix }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-
+            work-${{ env.SERIES }}-${{ runner.arch }}-${{ inputs.suffix }}-
+            work-${{ env.SERIES }}-${{ runner.arch }}-
+
+      - name: Unpack work tree
+        if: ${{ !inputs.clean }}
+        run: |
+          set -euo pipefail
+          .github/scripts/work-cache.sh unpack || {
+            echo "work-cache unpack failed or empty; starting cold"
+            rm -rf work
+            mkdir -p work
+          }
+
+      - name: Show free disk before build
+        run: |
+          df -h
+          if [[ -d work ]]; then du -sh work work/* 2>/dev/null || true; fi
+
+      - name: Upgrade system packages (into apt archive cache)
+        id: apt-upgrade
+        run: |
+          set -euo pipefail
+          mkdir -p "$APT_CACHE_DIR"
+          APT_ARCHIVES="$PWD/$APT_CACHE_DIR"
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt-get update
+          sudo apt-get upgrade -y -o "Dir::Cache::archives=$APT_ARCHIVES"
+          sudo rm -rf "$APT_ARCHIVES/partial" "$APT_ARCHIVES/lock"
+          sudo chown -R "$(id -u):$(id -g)" "$APT_CACHE_DIR"
+          # zstd needed to pack/unpack the work tree cache
+          sudo apt-get install -y -o "Dir::Cache::archives=$APT_ARCHIVES" zstd
+
+      - name: Build packages
+        id: build
+        env:
+          SERIES: ${{ env.SERIES }}
+          SUFFIX: ${{ inputs.suffix }}
+          CLEAN: ${{ inputs.clean && '1' || '0' }}
+          CLEAN_CACHE: ${{ inputs.clean_cache && '1' || '0' }}
+          CCACHE_MAXSIZE: 8G
+          DEB_BUILD_OPTIONS: noautodbgsym nodoc nocheck
+          APT_CACHE_DIR: ${{ env.APT_CACHE_DIR }}
+          APT_UPGRADE: "0"
+        run: |
+          chmod +x ./build.sh
+          ./build.sh
+
+      - name: Pack work tree for cache
+        id: pack-work
+        # Save partial progress on failure/cancel so the next run can resume.
+        # Skip on success — .debs are the artifact; keep cache quota for resumes.
+        if: ${{ always() && (steps.build.outcome == 'failure' || steps.build.outcome == 'cancelled') }}
+        run: |
+          set -euo pipefail
+          .github/scripts/work-cache.sh pack
+
+      - name: Save work tree cache
+        if: ${{ always() && steps.pack-work.outcome == 'success' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.WORK_CACHE_DIR }}
+          key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ inputs.suffix }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-${{ github.run_id }}
+
+      - name: Save apt package cache
+        if: always() && steps.apt-upgrade.outcome == 'success' && steps.restore-apt.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.APT_CACHE_DIR }}
+          key: apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', 'build.sh') }}
+
+      - name: Save ccache
+        # Keep compiler cache after success, failure, or cancel (helps the next run).
+        if: ${{ always() && (steps.build.outcome == 'success' || steps.build.outcome == 'failure' || steps.build.outcome == 'cancelled') }}
+        uses: actions/cache/save@v4
+        with:
+          path: cache/ccache
+          key: ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-${{ github.run_id }}
+
+      - name: Upload .deb artifacts
+        if: ${{ steps.build.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: libwebkitgtk-6.0-${{ env.SERIES }}
+          path: dist/*.deb
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: ${{ steps.build.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          DEBS=(dist/libwebkitgtk-6.0-4_*.deb)
+          if [[ ${#DEBS[@]} -eq 0 ]]; then
+            echo "error: no runtime .deb found in dist/" >&2
+            exit 1
+          fi
+          VERSION="$(dpkg-deb -f "${DEBS[0]}" Version)"
+          TAG="webkit2gtk-${VERSION}"
+          TAG_SAFE="${TAG//+/-}"
+          NOTES="Rebuilt Ubuntu webkit2gtk (${{ env.SERIES }}) with ENABLE_WEBDRIVER for GTK4/libwebkitgtk-6.0 (WebKit #318171).
+
+          Install the runtime package alongside system webkitgtk-webdriver:
+
+          \`\`\`bash
+          sudo apt install ./libwebkitgtk-6.0-4_*.deb
+          \`\`\`
+          "
+          if gh release view "$TAG_SAFE" >/dev/null 2>&1; then
+            gh release upload "$TAG_SAFE" dist/*.deb --clobber
+          else
+            gh release create "$TAG_SAFE" dist/*.deb \
+              --title "$TAG" \
+              --notes "$NOTES"
+          fi
