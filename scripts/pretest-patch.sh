@@ -119,6 +119,8 @@ echo "==> applying for real (temp tree only) to confirm"
   grep -q 'fuse-ld=gold' debian/rules
   ! grep -q 'reduce-memory-overheads' debian/rules
   ! grep -q 'fuse-ld=lld' debian/rules
+  grep -q -- '-Nlibwebkitgtk-doc' debian/rules
+  grep -q 'ifneq (\$(filter -N\$(LIBWEBKITGTKDOC_PKG)' debian/rules
 )
 
 echo "==> linker smoke check (gold)"

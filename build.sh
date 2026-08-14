@@ -45,6 +45,9 @@ MARKER_NAME=".webkitgtk-automation-prepared"
 # noautodbgsym: do not build separate debug-symbol packages (disk + time).
 # nodoc/nocheck: skip docs and tests.
 : "${DEB_BUILD_OPTIONS:=noautodbgsym nodoc nocheck}"
+# Cap ninja parallelism on hosted CI to reduce OOM risk (override with BUILD_PARALLEL_JOBS).
+BUILD_PARALLEL_JOBS="${BUILD_PARALLEL_JOBS:-}"
+QUIET_BUILD="${QUIET_BUILD:-0}"
 
 usage() {
   cat <<'EOF'
@@ -62,6 +65,8 @@ Env:
   CLEAN=1             Wipe WORK_DIR and start fresh (keeps ccache)
   CLEAN_CACHE=1       Also wipe CCACHE_DIR
   DEB_BUILD_OPTIONS   Default: "noautodbgsym nodoc nocheck"
+  BUILD_PARALLEL_JOBS Cap ninja/cmake jobs (auto 2 on GitHub Actions)
+  QUIET_BUILD=1       Filter verbose compile lines (auto on GitHub Actions)
 EOF
 }
 
@@ -88,6 +93,16 @@ else
 fi
 
 export DEBIAN_FRONTEND=noninteractive
+
+# devscripts/pbuilder postinst prompts for a mirror in non-interactive CI/shells.
+preseed_pbuilder_mirror() {
+  local mirror="${PBUILDER_MIRROR:-http://archive.ubuntu.com/ubuntu}"
+  if command -v debconf-set-selections >/dev/null 2>&1; then
+    echo "pbuilder pbuilder/default_mirror string $mirror" | "${SUDO[@]}" debconf-set-selections
+    echo "pbuilder pbuilder/override_mirror boolean false" | "${SUDO[@]}" debconf-set-selections
+  fi
+}
+
 export DEBEMAIL="${DEBEMAIL:-webkitgtk-automation@localhost}"
 export DEBFULLNAME="${DEBFULLNAME:-webkitgtk-automation}"
 export CCACHE_DIR
@@ -114,6 +129,44 @@ finalize_apt_cache() {
   fi
 }
 
+apply_ci_build_limits() {
+  if [[ -z "${GITHUB_ACTIONS:-}${CI_BUILD_LIMITS:-}" ]]; then
+    return 0
+  fi
+  local jobs="${BUILD_PARALLEL_JOBS:-2}"
+  export CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-$jobs}"
+  export NINJA_STATUS="[%f/%t] "
+  if [[ " $DEB_BUILD_OPTIONS " != *" parallel="* ]]; then
+    DEB_BUILD_OPTIONS+=" parallel=$jobs"
+    export DEB_BUILD_OPTIONS
+  fi
+  QUIET_BUILD="${QUIET_BUILD:-1}"
+  echo "==> CI runner limits: jobs=$jobs CMAKE_BUILD_PARALLEL_LEVEL=$CMAKE_BUILD_PARALLEL_LEVEL DEB_BUILD_OPTIONS=$DEB_BUILD_OPTIONS"
+}
+
+filter_build_log() {
+  # GitHub Actions truncates very large step logs; keep progress + failures only.
+  awk '
+    /^\[[0-9]+\/[0-9]+\]/ { print; fflush(); next }
+    /error:|FAILED:|fatal error:|collect2: error|undefined reference|Killed|No space left|dh_.*error|dpkg-buildpackage: error/ {
+      print; fflush(); next
+    }
+    /^make(\[[0-9]+\])?: \*\*\*/ { print; fflush(); next }
+    /^==>/ { print; fflush(); next }
+  '
+}
+
+run_dpkg_buildpackage() {
+  local log="$REPO_ROOT/build.log"
+  apply_ci_build_limits
+  if [[ "$QUIET_BUILD" == "1" ]]; then
+    echo "==> quiet build log → $log (progress + errors only in console)"
+    dpkg-buildpackage "${BUILD_ARGS[@]}" 2>&1 | tee "$log" | filter_build_log
+    return "${PIPESTATUS[0]}"
+  fi
+  dpkg-buildpackage "${BUILD_ARGS[@]}"
+}
+
 PATCH_SHA256="$(sha256sum "$PATCH" | awk '{print $1}')"
 
 echo "==> series=$SERIES suffix=$SUFFIX (host=${HOST_SERIES:-unknown})"
@@ -133,6 +186,7 @@ if [[ "$CLEAN" == "1" ]]; then
 fi
 
 apt_get update
+preseed_pbuilder_mirror
 
 if [[ "$APT_UPGRADE" == "1" ]]; then
   echo "==> apt-get upgrade (archives → ${APT_CACHE_DIR:-system})"
@@ -270,7 +324,7 @@ else
 fi
 
 echo "==> building packages (long-running; interrupt-safe if WORK_DIR is kept)"
-dpkg-buildpackage "${BUILD_ARGS[@]}"
+run_dpkg_buildpackage
 
 echo "==> ccache stats:"
 ccache -s || true
