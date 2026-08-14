@@ -32,6 +32,8 @@ SUFFIX="${SUFFIX:-${2:-+webkitgtk1}}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PATCH="$REPO_ROOT/patches/enable-webdriver-gtk4.patch"
 COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
+# shellcheck source=scripts/lib/debian-tarball.sh
+source "$REPO_ROOT/scripts/lib/debian-tarball.sh"
 WORK_DIR="${WORK_DIR:-$REPO_ROOT/work}"
 DIST_DIR="$REPO_ROOT/dist"
 CACHE_DIR="${CACHE_DIR:-$REPO_ROOT/cache}"
@@ -188,26 +190,6 @@ run_dpkg_buildpackage() {
 
 PATCH_SHA256="$(sha256sum "$PATCH" | awk '{print $1}')"
 
-find_debian_tarball() {
-  local parent="$1"
-  find "$parent" -maxdepth 1 -type f \( -name 'webkit2gtk_*_debian.tar.*' -o -name 'webkit2gtk_*.debian.tar.*' \) -print -quit 2>/dev/null || true
-}
-
-refresh_debian_rules_from_patch() {
-  local src="$1"
-  local parent debian_tar
-  parent="$(dirname "$src")"
-  debian_tar="$(find_debian_tarball "$parent")"
-  if [[ -z "$debian_tar" ]]; then
-    echo "error: cannot refresh debian/rules — no debian tarball in $parent" >&2
-    exit 1
-  fi
-  echo "==> packaging patch changed; restoring debian/rules from $(basename "$debian_tar")"
-  tar -xOf "$debian_tar" debian/rules > "$src/debian/rules"
-  echo "==> re-applying $PATCH (build-gtk4/ kept)"
-  patch -p1 < "$PATCH"
-}
-
 ensure_debian_control() {
   # Patched debian/rules enable/disable binary packages; tarball control can be stale.
   rm -f debian/control
@@ -299,6 +281,9 @@ mkdir -p "$WORK_DIR" "$DIST_DIR" "$CCACHE_DIR"
 export PATH="/usr/lib/ccache:${PATH}"
 ccache -M "$CCACHE_MAXSIZE" >/dev/null
 
+# Used by scripts/lib/debian-tarball.sh when refreshing debian/rules on resume.
+DOWNLOAD_WEBKIT2GTK_SOURCE_CMD='apt_get source -d webkit2gtk'
+
 find_src_dir() {
   # Prefer -print -quit over `find | head` (pipefail + SIGPIPE → bogus failures).
   find "$WORK_DIR" -maxdepth 1 -type d -name 'webkit2gtk-*' ! -name 'webkit2gtk-*.orig' -print -quit 2>/dev/null || true
@@ -340,7 +325,7 @@ if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]] && marker_matches "$SRC_DIR"; then
   cd "$SRC_DIR"
   stored_patch="$(marker_patch_sha256 "$SRC_DIR" || true)"
   if [[ -n "$stored_patch" && "$stored_patch" != "$PATCH_SHA256" ]]; then
-    refresh_debian_rules_from_patch "$SRC_DIR"
+    refresh_debian_rules_from_patch "$SRC_DIR" "$PATCH" || exit 1
     write_marker "$SRC_DIR"
   else
     write_marker "$SRC_DIR"

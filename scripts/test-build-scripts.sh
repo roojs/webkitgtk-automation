@@ -12,6 +12,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PATCH="$REPO_ROOT/patches/enable-webdriver-gtk4.patch"
 COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
 MARKER_NAME=".webkitgtk-automation-prepared"
+# shellcheck source=scripts/lib/debian-tarball.sh
+source "$REPO_ROOT/scripts/lib/debian-tarball.sh"
 
 host_series() {
   if [[ -r /etc/os-release ]]; then
@@ -49,6 +51,7 @@ test_shell_syntax() {
   for f in \
     "$REPO_ROOT/build.sh" \
     "$REPO_ROOT/scripts/pretest-patch.sh" \
+    "$REPO_ROOT/scripts/lib/debian-tarball.sh" \
     "$REPO_ROOT/scripts/test-build-scripts.sh" \
     "$REPO_ROOT/.github/scripts/work-cache.sh" \
     "$REPO_ROOT/.github/scripts/free-runner-disk.sh" \
@@ -203,14 +206,63 @@ test_packaging_flow() {
 
   # Simulate refresh_debian_rules_from_patch (build.sh resume path).
   echo "# stale" >>"$src/debian/rules"
-  tar -xOf "$deb_tar" debian/rules >"$src/debian/rules"
-  (
-    cd "$src"
-    patch -p1 < "$PATCH"
-  )
+  refresh_debian_rules_from_patch "$src" "$PATCH" || fail "rules refresh failed"
   restored_hash="$(sha256sum "$src/debian/rules" | awk '{print $1}')"
   [[ "$restored_hash" == "$patched_hash" ]] || fail "rules refresh did not reproduce patched debian/rules"
   pass "debian/rules refresh from tarball"
+  trap - RETURN
+}
+
+test_rules_refresh_without_cached_tarball() {
+  echo "==> rules refresh after work-cache unpack (no debian tarball in work/)"
+  local tmp staging work_root src deb_tar patched_hash apt_sources apt_lists apt_cache
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-resume.XXXXXX")"
+  staging="$tmp/staging"
+  work_root="$tmp/work"
+  src="$work_root/webkit2gtk-2.52.3"
+  trap 'rm -rf "$tmp"' RETURN
+
+  deb_tar="$(fetch_debian_tree "$staging")"
+  mkdir -p "$work_root"
+  cp -a "$staging/src" "$src"
+  (
+    cd "$src"
+    patch -p1 <"$PATCH"
+  )
+  patched_hash="$(sha256sum "$src/debian/rules" | awk '{print $1}')"
+
+  # work-cache.sh only packs webkit2gtk-*; tarball must not sit beside it.
+  find "$work_root" -maxdepth 1 -type f \( -name '*debian.tar.*' -o -name '*.debian.tar.*' \) -delete
+  [[ -z "$(find_debian_tarball "$work_root")" ]] || fail "work dir should have no debian tarball"
+
+  apt_sources="$tmp/apt-sources.list"
+  apt_lists="$tmp/apt-lists"
+  apt_cache="$tmp/apt-cache"
+  mkdir -p "$apt_lists/partial" "$apt_cache/archives/partial"
+  cat >"$apt_sources" <<SOURCES
+deb-src http://archive.ubuntu.com/ubuntu ${SERIES} main universe
+deb-src http://archive.ubuntu.com/ubuntu ${SERIES}-updates main universe
+deb-src http://archive.ubuntu.com/ubuntu ${SERIES}-security main universe
+SOURCES
+
+  DOWNLOAD_WEBKIT2GTK_SOURCE_CMD="apt-get update -qq \
+    -o Dir::Etc::sourcelist=$apt_sources \
+    -o Dir::Etc::sourceparts=/dev/null \
+    -o Dir::State::Lists=$apt_lists \
+    -o Dir::Cache=$apt_cache && \
+    apt-get source -d -y \
+    -o Dir::Etc::sourcelist=$apt_sources \
+    -o Dir::Etc::sourceparts=/dev/null \
+    -o Dir::State::Lists=$apt_lists \
+    -o Dir::Cache=$apt_cache \
+    webkit2gtk"
+
+  echo "# stale" >>"$src/debian/rules"
+  refresh_debian_rules_from_patch "$src" "$PATCH" || fail "refresh without cached tarball failed"
+  [[ -n "$(find_debian_tarball "$work_root")" ]] || fail "debian tarball should be downloaded into work/"
+  [[ "$(sha256sum "$src/debian/rules" | awk '{print $1}')" == "$patched_hash" ]] \
+    || fail "rules refresh without cached tarball did not reproduce patched debian/rules"
+  pass "download debian tarball on demand + refresh rules"
   trap - RETURN
 }
 
@@ -261,6 +313,7 @@ main() {
   test_compile_cache_key_pipefail
   test_marker_matching
   test_packaging_flow
+  test_rules_refresh_without_cached_tarball
   test_work_cache_roundtrip
 
   echo "==> pretest-patch.sh (patch apply + markers)"
