@@ -38,7 +38,7 @@ remove_path() {
     return 0
   fi
   echo "    removing: $label"
-  "${SUDO[@]}" rm -rf "$p"
+  "${SUDO[@]}" rm -rf "$p" || true
   after="$(bytes_of "$p")"
   saved=$(( (before - after) / 1024 / 1024 ))
   echo "    freed ~${saved} MiB from $label"
@@ -108,16 +108,6 @@ remove_path /usr/local/share/chromedriver-linux64 "ChromeDriver"
 remove_path /usr/local/share/edge_driver "EdgeDriver"
 remove_path /usr/local/share/gecko_driver "GeckoDriver"
 remove_path /usr/share/java/selenium-server.jar "Selenium jar"
-
-# Containers — we build natively; reclaim image layers
-echo "==> pruning Docker / container storage"
-if command -v docker >/dev/null 2>&1; then
-  "${SUDO[@]}" systemctl stop docker docker.socket containerd 2>/dev/null || true
-  docker system prune -af --volumes || true
-  docker builder prune -af || true
-fi
-remove_path /var/lib/docker "Docker lib (after prune)"
-remove_path /var/lib/containerd "containerd"
 
 # Database data dirs (services usually inactive, data still large)
 echo "==> stopping unused database/web services and removing data"
