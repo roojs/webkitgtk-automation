@@ -109,15 +109,6 @@ remove_path /usr/local/share/edge_driver "EdgeDriver"
 remove_path /usr/local/share/gecko_driver "GeckoDriver"
 remove_path /usr/share/java/selenium-server.jar "Selenium jar"
 
-# Database data dirs (services usually inactive, data still large)
-echo "==> stopping unused database/web services and removing data"
-for svc in mysql postgresql apache2 nginx mono-xsp4; do
-  "${SUDO[@]}" systemctl stop "$svc" 2>/dev/null || true
-  "${SUDO[@]}" systemctl disable "$svc" 2>/dev/null || true
-done
-remove_path /var/lib/mysql "MySQL data"
-remove_path /var/lib/postgresql "PostgreSQL data"
-
 # Snap cache if present
 remove_path /var/lib/snapd/snaps "snap packages"
 remove_path /var/cache/snapd "snap cache"
@@ -136,11 +127,6 @@ PURGE_PKGS=(
   firefox
   firefox-esr
   chromium-browser
-  apache2
-  nginx
-  mysql-server
-  postgresql
-  postgresql-16
   mono-complete
   mono-devel
   php8.3-cli
