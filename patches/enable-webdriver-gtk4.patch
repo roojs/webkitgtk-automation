@@ -1,6 +1,6 @@
 --- a/debian/rules
 +++ b/debian/rules
-@@ -6,19 +6,23 @@
+@@ -6,13 +6,15 @@
  include /usr/share/dpkg/buildflags.mk
  
  export CCACHE_NOHASHDIR=1
@@ -16,17 +16,18 @@
 -ENABLE_SOUP3=YES
 +ENABLE_SOUP3=NO
  ENABLE_GTK4=YES
- # If YES, build libwebkit2gtk-4.0-doc, libjavascriptcoregtk-4.0-bin and webkit2gtk-driver
- # If NO, build libwebkitgtk-doc, libjavascriptcoregtk-bin and webkitgtk-webdriver
- USE_OLD_PKG_NAMES=NO
+ # Set to YES to use the docs from the tarball instead of generating them.
+ # Use only if gi-docgen is not available.
+@@ -27,6 +29,8 @@
+ USE_OLD_WEBDRIVER_PKG=YES
  
  EXTRA_DH_ARGUMENTS =
-+# webkitgtk-automation: ship libwebkitgtk-6.0 only; keep system webkitgtk-webdriver.
-+EXTRA_DH_ARGUMENTS += -Nwebkitgtk-webdriver -Nlibjavascriptcoregtk-bin -Nlibwebkitgtk-doc
++# webkitgtk-automation: ship libwebkitgtk-6.0 only; keep system webkit2gtk-driver.
++EXTRA_DH_ARGUMENTS += -Nwebkit2gtk-driver -Nlibjavascriptcoregtk-bin -Nlibwebkitgtk-doc
  EXTRA_CMAKE_ARGUMENTS = -DPORT=GTK \
  	   -DCMAKE_INSTALL_LIBEXECDIR=lib/$(DEB_HOST_MULTIARCH) \
  	   -DCMAKE_C_FLAGS_RELEASE="" \
-@@ -27,7 +31,7 @@
+@@ -35,7 +39,7 @@
  	   -DCMAKE_CXX_FLAGS_DEBUG="" \
  	   -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
  	   -DUSE_LIBBACKTRACE=OFF \
@@ -35,7 +36,7 @@
  EXTRA_BUILD_ARGUMENTS =
  DH_GENCONTROL_ARGS =
  
-@@ -59,11 +63,15 @@
+@@ -62,11 +66,15 @@
  
  # The debug packages produced by webkit are huge and cause problems in
  # most buildds. Use -g1 in all architectures to make them smaller.
@@ -53,7 +54,7 @@
  
  # Don't build with -gsplit-dwarf (see #1016936)
  EXTRA_CMAKE_ARGUMENTS += -DDEBUG_FISSION=OFF
-@@ -203,6 +211,12 @@
+@@ -224,6 +232,12 @@
  	WEBDRIVER_DEP_PKG = libwebkitgtk-6.0-4
  endif
  
@@ -66,7 +67,7 @@
  # The debhelper files for the soup2, soup3 and gtk4 builds are identical
  # (apart from the API version) so we generate the last two from the first.
  WEBKIT_DH_FILES = \
-@@ -329,7 +343,7 @@
+@@ -360,7 +374,7 @@
  	$(SOUP3_BUILD) dh_auto_configure -Bbuild-soup3 -- \
  		$(EXTRA_CMAKE_ARGUMENTS) -DUSE_SOUP2=OFF -DUSE_GTK4=OFF \
  		$(ENABLE_WEBDRIVER_SOUP3) -DENABLE_DOCUMENTATION=OFF
@@ -75,7 +76,7 @@
  		$(EXTRA_CMAKE_ARGUMENTS) \
  		$(ENABLE_WEBDRIVER_GTK4)
  
-@@ -338,12 +352,24 @@
+@@ -369,12 +383,24 @@
  		dh_auto_build -Bbuild-soup2 $(EXTRA_BUILD_ARGUMENTS)
  	$(SOUP3_BUILD) CCACHE_BASEDIR=$(CURDIR)/build-soup3 \
  		dh_auto_build -Bbuild-soup3 $(EXTRA_BUILD_ARGUMENTS)
@@ -101,7 +102,7 @@
  
  override_dh_auto_clean: debian/control
  	$(SOUP2_BUILD) dh_auto_clean -Bbuild-soup2
-@@ -351,7 +377,8 @@
+@@ -382,7 +408,8 @@
  	$(GTK4_BUILD)  dh_auto_clean -Bbuild-gtk4
  	find Source Tools -type f -name "*.pyc" -exec rm {} \;
  	find Source Tools -depth -type d -name __pycache__ -exec rmdir {} \;
@@ -109,5 +110,5 @@
 +	# Only remove an in-tree cache; leave an external CCACHE_DIR alone.
 +	if [ "$(CCACHE_DIR)" = "$(CURDIR)/ccache" ] || [ "$(CCACHE_DIR)" = "ccache" ]; then rm -rf ccache; fi
  
- # Create a dummy doc directory in case the "nodoc" build option is set.
- override_dh_install-indep:
+ # If USE_PREBUILT_DOCS=YES then install them.
+ # Otherwise create a dummy doc directory in case the "nodoc" build option is set.

@@ -1,0 +1,36 @@
+name: Pretest patch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "patches/**"
+      - "scripts/pretest-patch.sh"
+      - "build.sh"
+      - ".github/workflows/pretest.yml"
+  pull_request:
+    paths:
+      - "patches/**"
+      - "scripts/pretest-patch.sh"
+      - "build.sh"
+      - ".github/workflows/pretest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SERIES: noble
+
+jobs:
+  pretest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Pretest patch apply (no WebKit compile)
+        run: |
+          chmod +x ./scripts/pretest-patch.sh
+          ./scripts/pretest-patch.sh

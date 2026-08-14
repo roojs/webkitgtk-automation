@@ -34,7 +34,23 @@ env:
   SERIES: noble
 
 jobs:
+  # Cheap gate: patch must apply to this series' debian/rules before we spend hours.
+  pretest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Pretest patch apply
+        env:
+          SERIES: ${{ env.SERIES }}
+        run: |
+          chmod +x ./scripts/pretest-patch.sh
+          ./scripts/pretest-patch.sh
+
   build:
+    needs: pretest
     # Prefer a large/self-hosted runner if available. Hosted runners persist
     # apt + ccache + packed work/ (build-gtk4) when under the cache size budget.
     runs-on: ubuntu-24.04
@@ -109,7 +125,6 @@ jobs:
           sudo apt-get upgrade -y -o "Dir::Cache::archives=$APT_ARCHIVES"
           sudo rm -rf "$APT_ARCHIVES/partial" "$APT_ARCHIVES/lock"
           sudo chown -R "$(id -u):$(id -g)" "$APT_CACHE_DIR"
-          # zstd needed to pack/unpack the work tree cache
           sudo apt-get install -y -o "Dir::Cache::archives=$APT_ARCHIVES" zstd
 
       - name: Build packages
@@ -129,8 +144,6 @@ jobs:
 
       - name: Pack work tree for cache
         id: pack-work
-        # Save partial progress on failure/cancel so the next run can resume.
-        # Skip on success — .debs are the artifact; keep cache quota for resumes.
         if: ${{ always() && (steps.build.outcome == 'failure' || steps.build.outcome == 'cancelled') }}
         run: |
           set -euo pipefail
@@ -151,7 +164,6 @@ jobs:
           key: apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', 'build.sh') }}
 
       - name: Save ccache
-        # Keep compiler cache after success, failure, or cancel (helps the next run).
         if: ${{ always() && (steps.build.outcome == 'success' || steps.build.outcome == 'failure' || steps.build.outcome == 'cancelled') }}
         uses: actions/cache/save@v4
         with:
@@ -183,7 +195,7 @@ jobs:
           TAG_SAFE="${TAG//+/-}"
           NOTES="Rebuilt Ubuntu webkit2gtk (${{ env.SERIES }}) with ENABLE_WEBDRIVER for GTK4/libwebkitgtk-6.0 (WebKit #318171).
 
-          Install the runtime package alongside system webkitgtk-webdriver:
+          Install the runtime package alongside system webkit2gtk-driver / webkitgtk-webdriver:
 
           \`\`\`bash
           sudo apt install ./libwebkitgtk-6.0-4_*.deb

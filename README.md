@@ -42,6 +42,17 @@ To revert to Ubuntu’s package:
 sudo apt install --reinstall libwebkitgtk-6.0-4
 ```
 
+## Pretest (no full build)
+
+Before spending hours on CI, prove the patch applies to this series’ `debian/rules`:
+
+```bash
+./scripts/pretest-patch.sh          # host series
+./scripts/pretest-patch.sh noble    # or explicit series
+```
+
+CI runs the same script as a **pretest** job that gates the heavy build, and on push/PR via `.github/workflows/pretest.yml`.
+
 ## Build locally
 
 Needs a lot of disk, RAM, and time (full WebKit package build).
@@ -95,13 +106,14 @@ CLEAN=1 CLEAN_CACHE=1 ./build.sh
 Native on `ubuntu-24.04` (**noble**). No Docker. Flow:
 
 1. Checkout
-2. **Free runner disk** — `.github/scripts/free-runner-disk.sh`
-3. Restore **apt**, **ccache**, and **work** caches
-4. Unpack work tree if present (resumes `build-gtk4` via `build.sh` `-nc`)
-5. `apt-get upgrade` into the apt archive cache
-6. `./build.sh`
-7. On **failure/cancel**: pack `work/` → save work cache (next run continues)
-8. Save apt / ccache; on success upload `.deb`s and create a Release
+2. **Pretest** — `scripts/pretest-patch.sh` (patch must apply; fails fast)
+3. **Free runner disk** — `.github/scripts/free-runner-disk.sh`
+4. Restore **apt**, **ccache**, and **work** caches
+5. Unpack work tree if present (resumes `build-gtk4` via `build.sh` `-nc`)
+6. `apt-get upgrade` into the apt archive cache
+7. `./build.sh`
+8. On **failure/cancel**: pack `work/` → save work cache (next run continues)
+9. Save apt / ccache; on success upload `.deb`s and create a Release
 
 If the packed work tree is over ~10 GiB, pack is skipped (Actions cache budget). Raise the repo Actions cache limit, use a self-hosted runner with a persistent `work/`, or rely on ccache alone.
 Inputs:
@@ -117,6 +129,7 @@ Inputs:
 
 | Path | Role |
 |------|------|
+| `scripts/pretest-patch.sh` | Dry-run patch against series `debian/rules` (no compile) |
 | `patches/enable-webdriver-gtk4.patch` | WebDriver GTK4 + CI resource / ccache / install fixes |
 | `build.sh` | Native fetch → patch → resumable `dpkg-buildpackage` → `dist/` |
 | `.github/scripts/free-runner-disk.sh` | Thorough hosted-runner cleanup |
