@@ -204,6 +204,12 @@ test_packaging_flow() {
   fi
   pass "debian/control gtk4-only"
 
+  # gtk4-only control must not use -N for soup3 packages that are not listed.
+  if grep -q -- '-Nlibwebkit2gtk-4.1-0' "$src/debian/rules"; then
+    fail "patched debian/rules must not -N soup3 packages when ENABLE_SOUP3=NO"
+  fi
+  pass "no invalid soup3 -N skip flags"
+
   # Simulate refresh_debian_rules_from_patch (build.sh resume path).
   echo "# stale" >>"$src/debian/rules"
   refresh_debian_rules_from_patch "$src" "$PATCH" || fail "rules refresh failed"

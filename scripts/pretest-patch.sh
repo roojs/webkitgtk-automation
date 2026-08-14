@@ -121,9 +121,8 @@ echo "==> applying for real (temp tree only) to confirm"
   ! grep -q 'fuse-ld=lld' debian/rules
   grep -q -- '-Nlibwebkitgtk-doc' debian/rules
   grep -q 'ifneq (\$(filter -N\$(LIBWEBKITGTKDOC_PKG)' debian/rules
-  grep -q 'ENABLE_SOUP3),YES' debian/rules
   grep -q '/MiniBrowser/d' debian/rules
-  grep -q -- '-Nlibwebkit2gtk-4.1-0' debian/rules
+  ! grep -q -- '-Nlibwebkit2gtk-4.1-0' debian/rules
 )
 
 echo "==> linker smoke check (gold)"

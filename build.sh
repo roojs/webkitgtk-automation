@@ -318,6 +318,24 @@ EOF
 
 SRC_DIR="$(find_src_dir)"
 RESUME=0
+RULES_REFRESHED=0
+
+drop_stale_packaging_state_after_rules_refresh() {
+  # Packaging-only rules change: gtk4-only control omits soup3 binaries, so -N soup3
+  # flags are invalid. Regenerated install lists must match patched override_dh_auto_configure.
+  echo "==> dropping stale gtk4 debhelper files and cmake cache after rules refresh"
+  rm -f \
+    debian/libwebkitgtk-6.0-4.install \
+    debian/libwebkitgtk-6.0-dev.install \
+    debian/gir1.2-webkit-6.0.install \
+    debian/libjavascriptcoregtk-6.0-1.install \
+    debian/libjavascriptcoregtk-6.0-dev.install \
+    debian/gir1.2-javascriptcoregtk-6.0.install \
+    debian/clean
+  if [[ -f build-gtk4/CMakeCache.txt ]]; then
+    rm -f build-gtk4/CMakeCache.txt
+  fi
+}
 
 if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]] && marker_matches "$SRC_DIR"; then
   RESUME=1
@@ -326,6 +344,7 @@ if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]] && marker_matches "$SRC_DIR"; then
   stored_patch="$(marker_patch_sha256 "$SRC_DIR" || true)"
   if [[ -n "$stored_patch" && "$stored_patch" != "$PATCH_SHA256" ]]; then
     refresh_debian_rules_from_patch "$SRC_DIR" "$PATCH" || exit 1
+    RULES_REFRESHED=1
     write_marker "$SRC_DIR"
   else
     write_marker "$SRC_DIR"
@@ -368,6 +387,10 @@ else
 fi
 
 cd "$SRC_DIR"
+
+if [[ "$RULES_REFRESHED" == "1" ]]; then
+  drop_stale_packaging_state_after_rules_refresh
+fi
 
 ensure_debian_control
 
