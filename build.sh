@@ -13,7 +13,7 @@
 #
 # CI resource knobs (defaults are CI-friendly):
 #   - DEB_BUILD_OPTIONS includes noautodbgsym (no huge .ddeb packages)
-#   - Patch uses -g0; stock Ubuntu linker / LDFLAGS (no -fuse-ld=lld)
+#   - Patch uses -g0; gold linker (-fuse-ld=gold) via binutils-gold; strips BFD-only --reduce-memory-overheads
 #   - GTK4-only build (soup3 skipped); system webkitgtk-webdriver is kept
 set -euo pipefail
 
@@ -146,7 +146,8 @@ apt_get install -y \
   ubuntu-dev-tools \
   patch \
   ca-certificates \
-  ccache
+  ccache \
+  binutils-gold
 
 enable_deb_src() {
   local changed=0

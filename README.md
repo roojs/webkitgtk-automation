@@ -95,7 +95,7 @@ CLEAN=1 CLEAN_CACHE=1 ./build.sh
 | **GTK4-only** (`ENABLE_SOUP3=NO`) | Ubuntu normally compiles WebKit twice (4.1 + 6.0). We only need 6.0, so we skip the soup3 build (~half the work). |
 | **`noautodbgsym`** | Do not emit separate `*-dbgsym` / `.ddeb` packages. |
 | **`-g0`** | Do not embed debug info in object files. |
-| **Stock Ubuntu linker / LDFLAGS** | Keep Ubuntu’s GNU `ld` and `-Wl,--reduce-memory-overheads` (no `-fuse-ld=lld`). Prefer a green configure over the lld memory tip for now. |
+| **Gold linker** (`-fuse-ld=gold`) | Use `binutils-gold` (`ld.gold`) for lower peak RAM than `ld.bfd` when linking JSC. Strip BFD-only `-Wl,--reduce-memory-overheads` (gold/lld reject or mangle it). |
 | **MiniBrowser off** | Skip a demo browser binary we do not ship. |
 
 ## Build on GitHub Actions

@@ -117,7 +117,22 @@ echo "==> applying for real (temp tree only) to confirm"
   grep -q 'ENABLE_WEBDRIVER_GTK4 = -DENABLE_WEBDRIVER=ON' debian/rules
   grep -q 'ENABLE_SOUP3=NO' debian/rules
   grep -q 'LDFLAGS += -Wl,--reduce-memory-overheads' debian/rules
+  grep -q 'LDFLAGS := $(filter-out -Wl,--reduce-memory-overheads,$(LDFLAGS))' debian/rules
+  grep -q 'fuse-ld=gold' debian/rules
   ! grep -q 'fuse-ld=lld' debian/rules
 )
+
+echo "==> linker smoke check (gold)"
+if ! command -v ld.gold >/dev/null 2>&1; then
+  echo "==> installing binutils-gold for smoke check"
+  sudo apt-get install -y binutils-gold
+fi
+if command -v cc >/dev/null 2>&1 && command -v ld.gold >/dev/null 2>&1; then
+  grep -q 'fuse-ld=gold' "$TMP/src/debian/rules"
+  echo 'int main(void){return 0;}' | cc -x c - -fuse-ld=gold -o "$TMP/linktest"
+  echo "==> gold link smoke OK ($TMP/linktest)"
+else
+  echo "warning: skipping gold link smoke (cc or ld.gold missing)" >&2
+fi
 
 echo "==> pretest OK (patch applies to $SERIES debian/rules)"
