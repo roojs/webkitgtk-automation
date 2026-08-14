@@ -1,0 +1,10 @@
+# Compile / ccache / work-tree cache version.
+#
+# Bump this file when patches/enable-webdriver-gtk4.patch changes anything that
+# affects compilation (CFLAGS/LDFLAGS, ENABLE_* build toggles, cmake args, ninja
+# build dirs, linker choice, parallel settings baked into rules, etc.).
+#
+# Do NOT bump for packaging-only debian/rules edits (dh_install skips, jdupes
+# guards, control generation, doc package tweaks) — those re-sync on resume
+# without invalidating build-gtk4/ or ccache.
+v1
