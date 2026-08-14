@@ -86,7 +86,14 @@ if [[ ! -f "$COMPILE_CACHE_KEY_FILE" ]]; then
   exit 1
 fi
 
-COMPILE_CACHE_KEY="$(tr -d '[:space:]' < "$COMPILE_CACHE_KEY_FILE" | grep -v '^#' | tail -n 1)"
+COMPILE_CACHE_KEY="$(
+  awk '
+    /^[[:space:]]*#/ { next }
+    /^[[:space:]]*$/ { next }
+    { gsub(/[[:space:]]/, "", $0); key = $0 }
+    END { print key }
+  ' "$COMPILE_CACHE_KEY_FILE"
+)"
 if [[ -z "$COMPILE_CACHE_KEY" ]]; then
   echo "error: $COMPILE_CACHE_KEY_FILE has no version line" >&2
   exit 1
