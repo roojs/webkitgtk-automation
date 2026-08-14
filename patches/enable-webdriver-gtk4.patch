@@ -48,9 +48,9 @@
  
  # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=949621
  LDFLAGS += -Wl,--reduce-memory-overheads
-+# webkitgtk-automation: lld uses less RAM than ld.bfd when linking libjavascriptcoregtk.
++# webkitgtk-automation: lld rejects BFD-only --reduce-memory-overheads; drop it then use lld.
++LDFLAGS := $(filter-out -Wl,--reduce-memory-overheads,$(LDFLAGS))
 +LDFLAGS += -fuse-ld=lld
-+LDFLAGS += -Wl,--no-keep-memory
  
  # Don't build with -gsplit-dwarf (see #1016936)
  EXTRA_CMAKE_ARGUMENTS += -DDEBUG_FISSION=OFF
