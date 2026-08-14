@@ -1,6 +1,11 @@
 name: Build libwebkitgtk-6.0 with WebDriver
 
+# Fire-and-forget: push a build-* tag, go away; .debs land on that tag's Release.
+# Manual runs still work via workflow_dispatch.
 on:
+  push:
+    tags:
+      - "build-*"
   workflow_dispatch:
     inputs:
       suffix:
@@ -27,11 +32,22 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: webkitgtk-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   APT_CACHE_DIR: .ci-cache/apt
   WORK_CACHE_DIR: .ci-cache/work
   # Native build on the runner image — must match runs-on.
   SERIES: noble
+  # workflow_dispatch inputs are empty on tag pushes — fall back to defaults.
+  SUFFIX: ${{ github.event.inputs.suffix || '+webkitgtk1' }}
+  CLEAN: ${{ github.event.inputs.clean == 'true' && '1' || '0' }}
+  CLEAN_CACHE: ${{ github.event.inputs.clean_cache == 'true' && '1' || '0' }}
+  REFRESH_APT: ${{ github.event.inputs.refresh_apt_cache == 'true' && '1' || '0' }}
+  # Tag that triggered the build (empty for manual runs).
+  TRIGGER_TAG: ${{ github.event_name == 'push' && github.ref_type == 'tag' && github.ref_name || '' }}
 
 jobs:
   # Cheap gate: patch must apply to this series' debian/rules before we spend hours.
@@ -70,7 +86,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ${{ env.APT_CACHE_DIR }}
-          key: apt-webkitgtk-v1-${{ inputs.refresh_apt_cache && github.run_id || 'stable' }}-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', 'build.sh') }}
+          key: apt-webkitgtk-v1-${{ env.REFRESH_APT == '1' && github.run_id || 'stable' }}-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', 'build.sh') }}
           restore-keys: |
             apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-
             apt-webkitgtk-v1-stable-${{ env.SERIES }}-
@@ -89,18 +105,18 @@ jobs:
 
       - name: Restore work tree cache (incremental build)
         id: restore-work
-        if: ${{ !inputs.clean }}
+        if: ${{ env.CLEAN != '1' }}
         uses: actions/cache/restore@v5
         with:
           path: ${{ env.WORK_CACHE_DIR }}
-          key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ inputs.suffix }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-${{ github.run_id }}
+          key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-${{ github.run_id }}
           restore-keys: |
-            work-${{ env.SERIES }}-${{ runner.arch }}-${{ inputs.suffix }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-
-            work-${{ env.SERIES }}-${{ runner.arch }}-${{ inputs.suffix }}-
+            work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-
+            work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-
             work-${{ env.SERIES }}-${{ runner.arch }}-
 
       - name: Unpack work tree
-        if: ${{ !inputs.clean }}
+        if: ${{ env.CLEAN != '1' }}
         run: |
           set -euo pipefail
           .github/scripts/work-cache.sh unpack || {
@@ -131,9 +147,9 @@ jobs:
         id: build
         env:
           SERIES: ${{ env.SERIES }}
-          SUFFIX: ${{ inputs.suffix }}
-          CLEAN: ${{ inputs.clean && '1' || '0' }}
-          CLEAN_CACHE: ${{ inputs.clean_cache && '1' || '0' }}
+          SUFFIX: ${{ env.SUFFIX }}
+          CLEAN: ${{ env.CLEAN }}
+          CLEAN_CACHE: ${{ env.CLEAN_CACHE }}
           CCACHE_MAXSIZE: 8G
           DEB_BUILD_OPTIONS: noautodbgsym nodoc nocheck
           APT_CACHE_DIR: ${{ env.APT_CACHE_DIR }}
@@ -154,7 +170,7 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: ${{ env.WORK_CACHE_DIR }}
-          key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ inputs.suffix }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-${{ github.run_id }}
+          key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-${{ github.run_id }}
 
       - name: Save apt package cache
         if: always() && steps.apt-upgrade.outcome == 'success' && steps.restore-apt.outputs.cache-hit != 'true'
@@ -178,10 +194,12 @@ jobs:
           path: dist/*.deb
           if-no-files-found: error
 
-      - name: Create GitHub Release
+      - name: Publish GitHub Release
         if: ${{ steps.build.outcome == 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
+          TRIGGER_TAG: ${{ env.TRIGGER_TAG }}
+          SERIES: ${{ env.SERIES }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -191,20 +209,33 @@ jobs:
             exit 1
           fi
           VERSION="$(dpkg-deb -f "${DEBS[0]}" Version)"
-          TAG="webkit2gtk-${VERSION}"
-          TAG_SAFE="${TAG//+/-}"
-          NOTES="Rebuilt Ubuntu webkit2gtk (${{ env.SERIES }}) with ENABLE_WEBDRIVER for GTK4/libwebkitgtk-6.0 (WebKit #318171).
+          NOTES="Rebuilt Ubuntu webkit2gtk (${SERIES}) with ENABLE_WEBDRIVER for GTK4/libwebkitgtk-6.0 (WebKit #318171).
 
-          Install the runtime package alongside system webkit2gtk-driver / webkitgtk-webdriver:
+          Package version: \`${VERSION}\`
+
+          Install alongside system webkit2gtk-driver / webkitgtk-webdriver:
 
           \`\`\`bash
           sudo apt install ./libwebkitgtk-6.0-4_*.deb
           \`\`\`
           "
-          if gh release view "$TAG_SAFE" >/dev/null 2>&1; then
-            gh release upload "$TAG_SAFE" dist/*.deb --clobber
+
+          if [[ -n "${TRIGGER_TAG}" ]]; then
+            # Tag-triggered: attach .debs to the precursor tag's Release.
+            RELEASE_TAG="${TRIGGER_TAG}"
+            TITLE="${TRIGGER_TAG} (${VERSION})"
           else
-            gh release create "$TAG_SAFE" dist/*.deb \
-              --title "$TAG" \
+            # Manual run: version-derived release tag (sanitize + for GitHub).
+            RELEASE_TAG="webkit2gtk-${VERSION//+/-}"
+            TITLE="webkit2gtk-${VERSION}"
+          fi
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" dist/*.deb --clobber
+            gh release edit "$RELEASE_TAG" --notes "$NOTES" || true
+          else
+            gh release create "$RELEASE_TAG" dist/*.deb \
+              --title "$TITLE" \
               --notes "$NOTES"
           fi
+          echo "Published to release: $RELEASE_TAG"

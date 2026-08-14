@@ -100,7 +100,21 @@ CLEAN=1 CLEAN_CACHE=1 ./build.sh
 
 ## Build on GitHub Actions
 
-**Actions → Build libwebkitgtk-6.0 with WebDriver → Run workflow**
+### Tag and walk away (preferred)
+
+Push a `build-*` tag — that starts the workflow. When it finishes, the `.deb`s are on that tag’s **Release**.
+
+```bash
+git tag build-$(date +%Y%m%d)
+git push origin build-$(date +%Y%m%d)
+# sleep / check Releases later — no need to babysit Actions
+```
+
+Examples: `build-20260814`, `build-noble-1`.
+
+### Manual run
+
+**Actions → Build libwebkitgtk-6.0 with WebDriver → Run workflow** (same pipeline).
 
 Native on `ubuntu-24.04` (**noble**). No Docker. Flow:
 
@@ -112,10 +126,11 @@ Native on `ubuntu-24.04` (**noble**). No Docker. Flow:
 6. `apt-get upgrade` into the apt archive cache
 7. `./build.sh`
 8. On **failure/cancel**: pack `work/` → save work cache (next run continues)
-9. Save apt / ccache; on success upload `.deb`s and create a Release
+9. Save apt / ccache; on success upload `.deb`s and publish a Release
 
 If the packed work tree is over ~10 GiB, pack is skipped (Actions cache budget). Raise the repo Actions cache limit, use a self-hosted runner with a persistent `work/`, or rely on ccache alone.
-Inputs:
+
+Manual `workflow_dispatch` inputs:
 
 | Input | Default | Meaning |
 |-------|---------|---------|
