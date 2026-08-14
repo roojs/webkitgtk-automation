@@ -58,12 +58,14 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
-      - name: Pretest patch apply
+      - name: Test build scripts (no WebKit compile)
         env:
           SERIES: ${{ env.SERIES }}
         run: |
-          chmod +x ./scripts/pretest-patch.sh
-          ./scripts/pretest-patch.sh
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq devscripts zstd binutils-gold
+          chmod +x ./scripts/test-build-scripts.sh ./scripts/pretest-patch.sh
+          ./scripts/test-build-scripts.sh
 
   build:
     needs: pretest

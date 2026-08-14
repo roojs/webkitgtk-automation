@@ -5,15 +5,19 @@ on:
     branches: [main]
     paths:
       - "patches/**"
-      - "scripts/pretest-patch.sh"
+      - "scripts/**"
       - "build.sh"
+      - ".github/compile-cache-key"
       - ".github/workflows/pretest.yml"
+      - ".github/workflows/build.yml"
   pull_request:
     paths:
       - "patches/**"
-      - "scripts/pretest-patch.sh"
+      - "scripts/**"
       - "build.sh"
+      - ".github/compile-cache-key"
       - ".github/workflows/pretest.yml"
+      - ".github/workflows/build.yml"
   workflow_dispatch:
 
 permissions:
@@ -30,7 +34,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
-      - name: Pretest patch apply (no WebKit compile)
+      - name: Test build scripts (no WebKit compile)
         run: |
-          chmod +x ./scripts/pretest-patch.sh
-          ./scripts/pretest-patch.sh
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq devscripts zstd binutils-gold
+          chmod +x ./scripts/test-build-scripts.sh ./scripts/pretest-patch.sh
+          ./scripts/test-build-scripts.sh
