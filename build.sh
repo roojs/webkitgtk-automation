@@ -31,6 +31,7 @@ SERIES="${SERIES:-${1:-$DEFAULT_SERIES}}"
 SUFFIX="${SUFFIX:-${2:-+webkitgtk1}}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PATCH="$REPO_ROOT/patches/enable-webdriver-gtk4.patch"
+COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
 WORK_DIR="${WORK_DIR:-$REPO_ROOT/work}"
 DIST_DIR="$REPO_ROOT/dist"
 CACHE_DIR="${CACHE_DIR:-$REPO_ROOT/cache}"
@@ -77,6 +78,17 @@ fi
 
 if [[ ! -f "$PATCH" ]]; then
   echo "error: missing patch: $PATCH" >&2
+  exit 1
+fi
+
+if [[ ! -f "$COMPILE_CACHE_KEY_FILE" ]]; then
+  echo "error: missing compile cache key: $COMPILE_CACHE_KEY_FILE" >&2
+  exit 1
+fi
+
+COMPILE_CACHE_KEY="$(tr -d '[:space:]' < "$COMPILE_CACHE_KEY_FILE" | grep -v '^#' | tail -n 1)"
+if [[ -z "$COMPILE_CACHE_KEY" ]]; then
+  echo "error: $COMPILE_CACHE_KEY_FILE has no version line" >&2
   exit 1
 fi
 
@@ -169,7 +181,49 @@ run_dpkg_buildpackage() {
 
 PATCH_SHA256="$(sha256sum "$PATCH" | awk '{print $1}')"
 
+find_debian_tarball() {
+  local parent="$1"
+  find "$parent" -maxdepth 1 -type f \( -name 'webkit2gtk_*_debian.tar.*' -o -name 'webkit2gtk_*.debian.tar.*' \) -print -quit 2>/dev/null || true
+}
+
+refresh_debian_rules_from_patch() {
+  local src="$1"
+  local parent debian_tar
+  parent="$(dirname "$src")"
+  debian_tar="$(find_debian_tarball "$parent")"
+  if [[ -z "$debian_tar" ]]; then
+    echo "error: cannot refresh debian/rules — no debian tarball in $parent" >&2
+    exit 1
+  fi
+  echo "==> packaging patch changed; restoring debian/rules from $(basename "$debian_tar")"
+  tar -xOf "$debian_tar" debian/rules > "$src/debian/rules"
+  echo "==> re-applying $PATCH (build-gtk4/ kept)"
+  patch -p1 < "$PATCH"
+}
+
+ensure_debian_control() {
+  # Patched debian/rules enable/disable binary packages; tarball control can be stale.
+  rm -f debian/control
+  echo "==> regenerating debian/control from debian/rules"
+  if ! fakeroot debian/rules debian/control; then
+    echo "error: debian/rules debian/control failed" >&2
+    exit 1
+  fi
+  if [[ ! -f debian/control ]]; then
+    echo "error: debian/control missing after regeneration" >&2
+    exit 1
+  fi
+}
+
+marker_patch_sha256() {
+  local src="$1"
+  local marker="$src/$MARKER_NAME"
+  [[ -f "$marker" ]] || return 1
+  awk -F= '/^PATCH_SHA256=/ { print $2; exit }' "$marker"
+}
+
 echo "==> series=$SERIES suffix=$SUFFIX (host=${HOST_SERIES:-unknown})"
+echo "==> compile cache key: $COMPILE_CACHE_KEY"
 echo "==> work dir: $WORK_DIR"
 echo "==> ccache:   $CCACHE_DIR (max $CCACHE_MAXSIZE)"
 echo "==> apt cache: ${APT_CACHE_DIR:-<system default>}"
@@ -195,6 +249,7 @@ fi
 
 apt_get install -y \
   devscripts \
+  fakeroot \
   quilt \
   dpkg-dev \
   ubuntu-dev-tools \
@@ -246,9 +301,16 @@ marker_matches() {
   local src="$1"
   local marker="$src/$MARKER_NAME"
   [[ -f "$marker" ]] || return 1
-  grep -qx "SERIES=$SERIES" "$marker" \
-    && grep -qx "SUFFIX=$SUFFIX" "$marker" \
-    && grep -qx "PATCH_SHA256=$PATCH_SHA256" "$marker"
+  grep -qx "SERIES=$SERIES" "$marker" || return 1
+  grep -qx "SUFFIX=$SUFFIX" "$marker" || return 1
+  if grep -qx "COMPILE_CACHE_KEY=$COMPILE_CACHE_KEY" "$marker"; then
+    return 0
+  fi
+  # Legacy markers (before compile-cache-key): resume and upgrade marker in-place.
+  if ! grep -q '^COMPILE_CACHE_KEY=' "$marker"; then
+    return 0
+  fi
+  return 1
 }
 
 write_marker() {
@@ -256,6 +318,7 @@ write_marker() {
   cat >"$src/$MARKER_NAME" <<EOF
 SERIES=$SERIES
 SUFFIX=$SUFFIX
+COMPILE_CACHE_KEY=$COMPILE_CACHE_KEY
 PATCH_SHA256=$PATCH_SHA256
 PREPARED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
@@ -267,9 +330,17 @@ RESUME=0
 if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]] && marker_matches "$SRC_DIR"; then
   RESUME=1
   echo "==> resuming existing tree: $SRC_DIR"
+  cd "$SRC_DIR"
+  stored_patch="$(marker_patch_sha256 "$SRC_DIR" || true)"
+  if [[ -n "$stored_patch" && "$stored_patch" != "$PATCH_SHA256" ]]; then
+    refresh_debian_rules_from_patch "$SRC_DIR"
+    write_marker "$SRC_DIR"
+  else
+    write_marker "$SRC_DIR"
+  fi
 else
   if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]]; then
-    echo "==> existing tree does not match series/suffix/patch; refreshing work dir"
+    echo "==> existing tree does not match series/suffix/compile cache key; refreshing work dir"
     rm -rf "$WORK_DIR"
     mkdir -p "$WORK_DIR"
   fi
@@ -306,8 +377,7 @@ fi
 
 cd "$SRC_DIR"
 
-# Stale debian/control from a cached work tree can still list soup3 packages.
-rm -f debian/control
+ensure_debian_control
 
 # Ensure PATH/ccache still exported for the package build.
 export PATH="/usr/lib/ccache:${PATH}"

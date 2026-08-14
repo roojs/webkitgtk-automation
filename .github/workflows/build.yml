@@ -100,8 +100,9 @@ jobs:
         id: restore-ccache
         with:
           path: cache/ccache
-          key: ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-${{ github.run_id }}
+          key: ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
           restore-keys: |
+            ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/compile-cache-key') }}-
             ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-
             ccache-${{ env.SERIES }}-${{ runner.arch }}-
             ccache-${{ env.SERIES }}-
@@ -112,8 +113,9 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ${{ env.WORK_CACHE_DIR }}
-          key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-${{ github.run_id }}
+          key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
           restore-keys: |
+            work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('.github/compile-cache-key') }}-
             work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-
             work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-
             work-${{ env.SERIES }}-${{ runner.arch }}-
@@ -175,7 +177,7 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: ${{ env.WORK_CACHE_DIR }}
-          key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-${{ github.run_id }}
+          key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
 
       - name: Save apt package cache
         if: always() && steps.apt-upgrade.outcome == 'success' && steps.restore-apt.outputs.cache-hit != 'true'
@@ -189,7 +191,7 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: cache/ccache
-          key: ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-${{ github.run_id }}
+          key: ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
 
       - name: Upload .deb artifacts
         if: ${{ steps.build.outcome == 'success' }}
