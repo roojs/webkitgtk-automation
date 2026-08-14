@@ -2,6 +2,7 @@
 /cache/
 /.ci-cache/
 /dist/*.deb
+build.log
 *.deb
 *.ddeb
 *.buildinfo
