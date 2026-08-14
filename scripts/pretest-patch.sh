@@ -116,9 +116,8 @@ echo "==> applying for real (temp tree only) to confirm"
   # Spot-check critical markers landed.
   grep -q 'ENABLE_WEBDRIVER_GTK4 = -DENABLE_WEBDRIVER=ON' debian/rules
   grep -q 'ENABLE_SOUP3=NO' debian/rules
-  grep -q 'LDFLAGS += -Wl,--reduce-memory-overheads' debian/rules
-  grep -q 'LDFLAGS := $(filter-out -Wl,--reduce-memory-overheads,$(LDFLAGS))' debian/rules
   grep -q 'fuse-ld=gold' debian/rules
+  ! grep -q 'reduce-memory-overheads' debian/rules
   ! grep -q 'fuse-ld=lld' debian/rules
 )
 

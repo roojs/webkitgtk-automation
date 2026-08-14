@@ -36,7 +36,7 @@
  EXTRA_BUILD_ARGUMENTS =
  DH_GENCONTROL_ARGS =
  
-@@ -62,11 +66,16 @@
+@@ -62,11 +66,14 @@
  
  # The debug packages produced by webkit are huge and cause problems in
  # most buildds. Use -g1 in all architectures to make them smaller.
@@ -47,15 +47,14 @@
 +CXXFLAGS := $(CXXFLAGS:-g=-g0)
  
  # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=949621
- LDFLAGS += -Wl,--reduce-memory-overheads
-+# webkitgtk-automation: use gold for lower peak RAM than ld.bfd when linking JSC.
-+# Drop BFD-only --reduce-memory-overheads (gold/lld reject or mangle it).
-+LDFLAGS := $(filter-out -Wl,--reduce-memory-overheads,$(LDFLAGS))
+-LDFLAGS += -Wl,--reduce-memory-overheads
++# webkitgtk-automation: omit BFD-only reduce-memory overheads; use gold.
 +LDFLAGS += -fuse-ld=gold
++export LDFLAGS
  
  # Don't build with -gsplit-dwarf (see #1016936)
  EXTRA_CMAKE_ARGUMENTS += -DDEBUG_FISSION=OFF
-@@ -224,6 +233,12 @@
+@@ -224,6 +231,12 @@
  	WEBDRIVER_DEP_PKG = libwebkitgtk-6.0-4
  endif
  
@@ -68,7 +67,7 @@
  # The debhelper files for the soup2, soup3 and gtk4 builds are identical
  # (apart from the API version) so we generate the last two from the first.
  WEBKIT_DH_FILES = \
-@@ -360,7 +375,7 @@
+@@ -360,7 +373,7 @@
  	$(SOUP3_BUILD) dh_auto_configure -Bbuild-soup3 -- \
  		$(EXTRA_CMAKE_ARGUMENTS) -DUSE_SOUP2=OFF -DUSE_GTK4=OFF \
  		$(ENABLE_WEBDRIVER_SOUP3) -DENABLE_DOCUMENTATION=OFF
@@ -77,7 +76,7 @@
  		$(EXTRA_CMAKE_ARGUMENTS) \
  		$(ENABLE_WEBDRIVER_GTK4)
  
-@@ -369,12 +384,24 @@
+@@ -369,12 +382,24 @@
  		dh_auto_build -Bbuild-soup2 $(EXTRA_BUILD_ARGUMENTS)
  	$(SOUP3_BUILD) CCACHE_BASEDIR=$(CURDIR)/build-soup3 \
  		dh_auto_build -Bbuild-soup3 $(EXTRA_BUILD_ARGUMENTS)
@@ -103,7 +102,7 @@
  
  override_dh_auto_clean: debian/control
  	$(SOUP2_BUILD) dh_auto_clean -Bbuild-soup2
-@@ -382,7 +409,8 @@
+@@ -382,7 +407,8 @@
  	$(GTK4_BUILD)  dh_auto_clean -Bbuild-gtk4
  	find Source Tools -type f -name "*.pyc" -exec rm {} \;
  	find Source Tools -depth -type d -name __pycache__ -exec rmdir {} \;
