@@ -115,8 +115,9 @@ echo "==> applying for real (temp tree only) to confirm"
   patch -p1 < "$PATCH" >/dev/null
   # Spot-check critical markers landed.
   grep -q 'ENABLE_WEBDRIVER_GTK4 = -DENABLE_WEBDRIVER=ON' debian/rules
-  grep -q 'fuse-ld=lld' debian/rules
   grep -q 'ENABLE_SOUP3=NO' debian/rules
+  grep -q 'LDFLAGS += -Wl,--reduce-memory-overheads' debian/rules
+  ! grep -q 'fuse-ld=lld' debian/rules
 )
 
 echo "==> pretest OK (patch applies to $SERIES debian/rules)"

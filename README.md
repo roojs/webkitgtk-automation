@@ -95,7 +95,7 @@ CLEAN=1 CLEAN_CACHE=1 ./build.sh
 | **GTK4-only** (`ENABLE_SOUP3=NO`) | Ubuntu normally compiles WebKit twice (4.1 + 6.0). We only need 6.0, so we skip the soup3 build (~half the work). |
 | **`noautodbgsym`** | Do not emit separate `*-dbgsym` / `.ddeb` packages. |
 | **`-g0`** | Do not embed debug info in object files. |
-| **`-fuse-ld=lld`** | Use **lld** instead of GNU `ld` so linking `libjavascriptcoregtk` is less likely to OOM. Drops Ubuntu’s BFD-only `-Wl,--reduce-memory-overheads` (lld rejects it). |
+| **Stock Ubuntu linker / LDFLAGS** | Keep Ubuntu’s GNU `ld` and `-Wl,--reduce-memory-overheads` (no `-fuse-ld=lld`). Prefer a green configure over the lld memory tip for now. |
 | **MiniBrowser off** | Skip a demo browser binary we do not ship. |
 
 ## Build on GitHub Actions

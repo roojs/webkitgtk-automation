@@ -13,7 +13,7 @@
 #
 # CI resource knobs (defaults are CI-friendly):
 #   - DEB_BUILD_OPTIONS includes noautodbgsym (no huge .ddeb packages)
-#   - Patch uses -fuse-ld=lld (less RAM linking libjavascriptcoregtk) and -g0
+#   - Patch uses -g0; stock Ubuntu linker / LDFLAGS (no -fuse-ld=lld)
 #   - GTK4-only build (soup3 skipped); system webkitgtk-webdriver is kept
 set -euo pipefail
 
@@ -146,8 +146,7 @@ apt_get install -y \
   ubuntu-dev-tools \
   patch \
   ca-certificates \
-  ccache \
-  lld
+  ccache
 
 enable_deb_src() {
   local changed=0
