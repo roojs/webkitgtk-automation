@@ -1,0 +1,50 @@
+name: Monitor upstream webkit2gtk
+
+# Daily: if Ubuntu publishes a newer webkit2gtk source for noble, pretest and push
+# a build-upstream-* tag (same path as manual build-* tags).
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: Run pretest and queue a build even if upstream matches tracked
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: Log what would happen without committing, tagging, or pushing
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: webkitgtk-monitor-upstream
+  cancel-in-progress: false
+
+env:
+  SERIES: noble
+
+jobs:
+  monitor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Monitor upstream and queue build if needed
+        env:
+          SERIES: ${{ env.SERIES }}
+          DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '0' }}
+          FORCE_BUILD: ${{ github.event.inputs.force_build == 'true' && '1' || '0' }}
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq devscripts zstd binutils-gold
+          chmod +x ./scripts/upstream-webkit-version.sh ./scripts/monitor-upstream-build.sh
+          ./scripts/monitor-upstream-build.sh

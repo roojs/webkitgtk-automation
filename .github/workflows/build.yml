@@ -248,3 +248,41 @@ jobs:
               --notes "$NOTES"
           fi
           echo "Published to release: $RELEASE_TAG"
+
+      - name: Update tracked upstream version
+        if: ${{ steps.build.outcome == 'success' }}
+        env:
+          SUFFIX: ${{ env.SUFFIX }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          DEBS=(dist/libwebkitgtk-6.0-4_*.deb)
+          if [[ ${#DEBS[@]} -eq 0 ]]; then
+            echo "error: no runtime .deb for tracked version update" >&2
+            exit 1
+          fi
+          pkg_version="$(dpkg-deb -f "${DEBS[0]}" Version)"
+          upstream="${pkg_version%$SUFFIX}"
+          if [[ "$upstream" == "$pkg_version" ]]; then
+            echo "warning: package version $pkg_version did not end with suffix $SUFFIX" >&2
+            upstream="${pkg_version%%+*}"
+          fi
+          echo "==> recording tracked upstream webkit2gtk version: $upstream"
+          cat >.github/tracked-upstream-version <<EOF
+# Last upstream webkit2gtk source version we successfully built and released.
+# Updated automatically when a tag-triggered build publishes .debs.
+$upstream
+EOF
+          cat >.github/pending-upstream-version <<'EOF'
+# Upstream webkit2gtk version queued for an in-flight auto-build (empty = none).
+
+EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/tracked-upstream-version .github/pending-upstream-version
+          if git diff --staged --quiet; then
+            echo "==> tracked upstream version unchanged"
+            exit 0
+          fi
+          git commit -m "Track upstream webkit2gtk $upstream after successful build"
+          git push origin HEAD

@@ -51,6 +51,8 @@ test_shell_syntax() {
   for f in \
     "$REPO_ROOT/build.sh" \
     "$REPO_ROOT/scripts/pretest-patch.sh" \
+    "$REPO_ROOT/scripts/upstream-webkit-version.sh" \
+    "$REPO_ROOT/scripts/monitor-upstream-build.sh" \
     "$REPO_ROOT/scripts/lib/debian-tarball.sh" \
     "$REPO_ROOT/scripts/test-build-scripts.sh" \
     "$REPO_ROOT/.github/scripts/work-cache.sh" \
@@ -309,6 +311,14 @@ EOF
   trap - RETURN
 }
 
+test_upstream_version_probe() {
+  echo "==> upstream webkit2gtk version probe"
+  local ver
+  ver="$("$REPO_ROOT/scripts/upstream-webkit-version.sh" "$SERIES")"
+  [[ "$ver" =~ ^[0-9] ]] || fail "unexpected upstream version: $ver"
+  pass "archive version $ver"
+}
+
 main() {
   echo "==> test-build-scripts series=$SERIES"
   [[ -f "$PATCH" ]] || fail "missing $PATCH"
@@ -318,6 +328,7 @@ main() {
   test_shell_syntax
   test_compile_cache_key_pipefail
   test_marker_matching
+  test_upstream_version_probe
   test_packaging_flow
   test_rules_refresh_without_cached_tarball
   test_work_cache_roundtrip

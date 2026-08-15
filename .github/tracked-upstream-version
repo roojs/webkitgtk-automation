@@ -1,0 +1,4 @@
+# Last upstream webkit2gtk source version we successfully built and released.
+# Updated automatically when a tag-triggered build publishes .debs.
+# Do not edit by hand unless resetting monitor state.
+2.52.3-0ubuntu0.24.04.1

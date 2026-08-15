@@ -6,18 +6,20 @@ on:
     paths:
       - "patches/**"
       - "scripts/**"
+      - ".github/**"
       - "build.sh"
-      - ".github/compile-cache-key"
       - ".github/workflows/pretest.yml"
       - ".github/workflows/build.yml"
+      - ".github/workflows/monitor-upstream.yml"
   pull_request:
     paths:
       - "patches/**"
       - "scripts/**"
+      - ".github/**"
       - "build.sh"
-      - ".github/compile-cache-key"
       - ".github/workflows/pretest.yml"
       - ".github/workflows/build.yml"
+      - ".github/workflows/monitor-upstream.yml"
   workflow_dispatch:
 
 permissions:
