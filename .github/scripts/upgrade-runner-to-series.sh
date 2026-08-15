@@ -17,9 +17,12 @@ else
 fi
 
 export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
 
 TARGET_SERIES="${TARGET_SERIES:?TARGET_SERIES is required}"
-APT_CACHE_DIR="${APT_CACHE_DIR:-}"
+# Workspace apt cache is for build.sh only — dist-upgrade must use /var/cache/apt/archives.
+WORKSPACE_APT_CACHE_DIR="${APT_CACHE_DIR:-}"
+APT_CACHE_DIR=""
 
 # shellcheck source=scripts/lib/host-series.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/lib/host-series.sh"
@@ -37,15 +40,41 @@ fi
 
 apt_archive_opts() {
   if [[ -n "$APT_CACHE_DIR" ]]; then
-    mkdir -p "$APT_CACHE_DIR"
+    mkdir -p "$APT_CACHE_DIR/partial"
     APT_CACHE_DIR="$(cd "$APT_CACHE_DIR" && pwd)"
     echo "-o" "Dir::Cache::archives=$APT_CACHE_DIR"
   fi
 }
 
+prepare_workspace_apt_cache() {
+  [[ -n "$WORKSPACE_APT_CACHE_DIR" ]] || return 0
+  APT_CACHE_DIR="$WORKSPACE_APT_CACHE_DIR"
+  mkdir -p "$APT_CACHE_DIR/partial"
+  APT_CACHE_DIR="$(cd "$APT_CACHE_DIR" && pwd)"
+  "${SUDO[@]}" chown -R _apt:root "$APT_CACHE_DIR"
+  "${SUDO[@]}" chmod -R u+rwX,g+rwX "$APT_CACHE_DIR"
+}
+
+finalize_workspace_apt_cache() {
+  [[ -n "$WORKSPACE_APT_CACHE_DIR" ]] || return 0
+  "${SUDO[@]}" rm -rf "$WORKSPACE_APT_CACHE_DIR/partial" "$WORKSPACE_APT_CACHE_DIR/lock" 2>/dev/null || true
+  if [[ "$(id -u)" -ne 0 ]]; then
+    "${SUDO[@]}" chown -R "$(id -u):$(id -g)" "$WORKSPACE_APT_CACHE_DIR"
+  fi
+  APT_CACHE_DIR=""
+}
+
 apt_get() {
+  if [[ -n "$APT_CACHE_DIR" ]]; then
+    prepare_workspace_apt_cache
+  fi
   # shellcheck disable=SC2046
   "${SUDO[@]}" apt-get $(apt_archive_opts) "$@"
+  local rc=$?
+  if [[ -n "$APT_CACHE_DIR" ]]; then
+    finalize_workspace_apt_cache
+  fi
+  return "$rc"
 }
 
 remove_preinstalled_tool() {
@@ -141,13 +170,6 @@ install_orchestration_packages() {
       "cmake-data=${archive_cmake_data}"
     "${SUDO[@]}" apt-mark hold cmake cmake-data >/dev/null
   fi
-
-  if [[ -n "$APT_CACHE_DIR" ]]; then
-    "${SUDO[@]}" rm -rf "$APT_CACHE_DIR/partial" "$APT_CACHE_DIR/lock"
-    if [[ "$(id -u)" -ne 0 ]]; then
-      "${SUDO[@]}" chown -R "$(id -u):$(id -g)" "$APT_CACHE_DIR"
-    fi
-  fi
 }
 
 verify_toolchain() {
@@ -193,21 +215,12 @@ add_swap() {
 # shellcheck source=.github/scripts/strip-third-party-apt-sources.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/strip-third-party-apt-sources.sh"
 
-prepare_apt_cache_dir() {
-  [[ -n "$APT_CACHE_DIR" ]] || return 0
-  mkdir -p "$APT_CACHE_DIR/partial"
-  APT_CACHE_DIR="$(cd "$APT_CACHE_DIR" && pwd)"
-  # _apt must read the workspace cache when apt runs via sudo.
-  "${SUDO[@]}" chown -R _apt:root "$APT_CACHE_DIR"
-  "${SUDO[@]}" chmod -R u+rwX,g+rwX "$APT_CACHE_DIR"
-}
-
 main() {
   echo "==> upgrade-runner-to-series: $BASE_SERIES → $TARGET_SERIES"
+  echo "==> dist-upgrade uses system apt cache (not workspace cache)"
   add_swap
   strip_conflicting_runner_tools
   strip_third_party_apt_sources
-  prepare_apt_cache_dir
   remove_runner_apt_sources
   write_ubuntu_archive_sources "$BASE_SERIES"
 

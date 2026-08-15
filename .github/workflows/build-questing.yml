@@ -77,6 +77,12 @@ jobs:
           chmod +x .github/scripts/free-runner-disk.sh .github/scripts/work-cache.sh .github/scripts/upgrade-runner-to-series.sh .github/scripts/strip-third-party-apt-sources.sh
           .github/scripts/free-runner-disk.sh
 
+      - name: Upgrade runner noble → questing
+        env:
+          TARGET_SERIES: ${{ env.SERIES }}
+          BASE_SERIES: noble
+        run: .github/scripts/upgrade-runner-to-series.sh
+
       - name: Restore apt package cache
         id: restore-apt
         uses: actions/cache/restore@v5
@@ -87,20 +93,6 @@ jobs:
             apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-
             apt-webkitgtk-v1-stable-${{ env.SERIES }}-
             apt-webkitgtk-v1-
-
-      - name: Upgrade runner noble → questing
-        env:
-          TARGET_SERIES: ${{ env.SERIES }}
-          BASE_SERIES: noble
-          APT_CACHE_DIR: ${{ env.APT_CACHE_DIR }}
-        run: .github/scripts/upgrade-runner-to-series.sh
-
-      - name: Save apt package cache
-        if: always() && steps.restore-apt.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: ${{ env.APT_CACHE_DIR }}
-          key: apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build-questing.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/upgrade-runner-to-series.sh', 'build.sh') }}
 
       - name: Restore ccache
         uses: actions/cache/restore@v5
@@ -172,6 +164,13 @@ jobs:
         with:
           path: ${{ env.WORK_CACHE_DIR }}
           key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
+
+      - name: Save apt package cache
+        if: always() && steps.restore-apt.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ env.APT_CACHE_DIR }}
+          key: apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build-questing.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/upgrade-runner-to-series.sh', 'build.sh') }}
 
       - name: Save ccache
         if: ${{ always() && (steps.build.outcome == 'success' || steps.build.outcome == 'failure' || steps.build.outcome == 'cancelled') }}
