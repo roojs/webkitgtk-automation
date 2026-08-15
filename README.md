@@ -133,7 +133,7 @@ git push origin build-resolute-$(date +%Y%m%d)
 
 Workflow: **Build libwebkitgtk-6.0 with WebDriver** (`.github/workflows/build.yml`).
 
-Native on `ubuntu-26.04`. Resolute CI currently fails at CMake configure (GHA CMake 4.4 vs WebKit 2.52.3) — out of scope here.
+Native on `ubuntu-26.04`. CI strips GHA preinstalls (CMake 4.4, browsers, SDKs), rewrites apt to `archive.ubuntu.com`, installs archive cmake and holds it, then builds.
 
 When a workflow finishes, the `.deb`s are on that tag's **Release**.
 

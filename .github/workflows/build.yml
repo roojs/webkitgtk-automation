@@ -80,24 +80,32 @@ jobs:
 
       - name: Free runner disk (remove unused SDKs)
         run: |
-          chmod +x .github/scripts/free-runner-disk.sh .github/scripts/work-cache.sh .github/scripts/setup-ci-build-env.sh
+          chmod +x .github/scripts/free-runner-disk.sh .github/scripts/work-cache.sh .github/scripts/setup-ci-build-env.sh .github/scripts/strip-third-party-apt-sources.sh .github/scripts/normalize-runner-apt-sources.sh
           .github/scripts/free-runner-disk.sh
-
-      - name: Setup minimal build environment
-        env:
-          APT_CACHE_DIR: ${{ env.APT_CACHE_DIR }}
-        run: .github/scripts/setup-ci-build-env.sh
 
       - name: Restore apt package cache
         id: restore-apt
         uses: actions/cache/restore@v5
         with:
           path: ${{ env.APT_CACHE_DIR }}
-          key: apt-webkitgtk-v1-${{ env.REFRESH_APT == '1' && github.run_id || 'stable' }}-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/setup-ci-build-env.sh', 'build.sh') }}
+          key: apt-webkitgtk-v1-${{ env.REFRESH_APT == '1' && github.run_id || 'stable' }}-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/setup-ci-build-env.sh', '.github/scripts/normalize-runner-apt-sources.sh', 'build.sh') }}
           restore-keys: |
             apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-
             apt-webkitgtk-v1-stable-${{ env.SERIES }}-
             apt-webkitgtk-v1-
+
+      - name: Fix apt cache ownership for _apt
+        run: |
+          if [[ -d "${{ env.APT_CACHE_DIR }}" ]]; then
+            sudo mkdir -p "${{ env.APT_CACHE_DIR }}/partial"
+            sudo chown -R _apt:root "${{ env.APT_CACHE_DIR }}"
+            sudo chmod -R u+rwX,g+rwX "${{ env.APT_CACHE_DIR }}"
+          fi
+
+      - name: Setup minimal build environment
+        env:
+          APT_CACHE_DIR: ${{ env.APT_CACHE_DIR }}
+        run: .github/scripts/setup-ci-build-env.sh
 
       - name: Restore ccache
         uses: actions/cache/restore@v5
@@ -175,7 +183,7 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: ${{ env.APT_CACHE_DIR }}
-          key: apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/setup-ci-build-env.sh', 'build.sh') }}
+          key: apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/setup-ci-build-env.sh', '.github/scripts/normalize-runner-apt-sources.sh', 'build.sh') }}
 
       - name: Save ccache
         if: ${{ always() && (steps.build.outcome == 'success' || steps.build.outcome == 'failure' || steps.build.outcome == 'cancelled') }}

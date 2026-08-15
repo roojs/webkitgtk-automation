@@ -86,39 +86,8 @@ strip_conflicting_runner_tools() {
   done
 }
 
-remove_runner_apt_sources() {
-  echo "==> removing GHA runner apt sources (mirrorlist / azure / third-party)"
-  local f
-  shopt -s nullglob
-  for f in /etc/apt/sources.list.d/*; do
-    [[ -f "$f" ]] || continue
-    echo "    removing $f"
-    "${SUDO[@]}" rm -f "$f"
-  done
-  shopt -u nullglob
-  if [[ -f /etc/apt/sources.list ]]; then
-    "${SUDO[@]}" tee /etc/apt/sources.list >/dev/null <<'EOF'
-# Managed by webkitgtk-automation upgrade-runner-to-series.sh
-EOF
-  fi
-  if [[ -f /etc/apt/apt-mirrors.txt ]]; then
-    echo "    removing /etc/apt/apt-mirrors.txt"
-    "${SUDO[@]}" rm -f /etc/apt/apt-mirrors.txt
-  fi
-  "${SUDO[@]}" rm -rf /var/lib/apt/lists/*
-}
-
-write_ubuntu_archive_sources() {
-  local series="$1"
-  echo "==> writing Ubuntu archive sources for $series (archive.ubuntu.com only)"
-  "${SUDO[@]}" tee /etc/apt/sources.list.d/ubuntu.sources >/dev/null <<EOF
-Types: deb deb-src
-URIs: http://archive.ubuntu.com/ubuntu
-Suites: ${series} ${series}-updates ${series}-security
-Components: main universe restricted multiverse
-Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-EOF
-}
+# shellcheck source=.github/scripts/normalize-runner-apt-sources.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/normalize-runner-apt-sources.sh"
 
 apt_dist_upgrade() {
   local rc=0

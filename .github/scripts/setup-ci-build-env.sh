@@ -30,15 +30,36 @@ host_series() {
 
 apt_archive_opts() {
   if [[ -n "$APT_CACHE_DIR" ]]; then
-    mkdir -p "$APT_CACHE_DIR"
+    mkdir -p "$APT_CACHE_DIR/partial"
     APT_CACHE_DIR="$(cd "$APT_CACHE_DIR" && pwd)"
     echo "-o" "Dir::Cache::archives=$APT_CACHE_DIR"
   fi
 }
 
+prepare_apt_cache() {
+  [[ -n "$APT_CACHE_DIR" ]] || return 0
+  mkdir -p "$APT_CACHE_DIR/partial"
+  APT_CACHE_DIR="$(cd "$APT_CACHE_DIR" && pwd)"
+  "${SUDO[@]}" chown -R _apt:root "$APT_CACHE_DIR"
+  "${SUDO[@]}" chmod -R u+rwX,g+rwX "$APT_CACHE_DIR"
+}
+
+finalize_apt_cache() {
+  [[ -n "$APT_CACHE_DIR" ]] || return 0
+  local cache_dir="$APT_CACHE_DIR"
+  "${SUDO[@]}" rm -rf "$cache_dir/partial" "$cache_dir/lock" 2>/dev/null || true
+  if [[ "$(id -u)" -ne 0 ]]; then
+    "${SUDO[@]}" chown -R "$(id -u):$(id -g)" "$cache_dir"
+  fi
+}
+
 apt_get() {
+  prepare_apt_cache
   # shellcheck disable=SC2046
   "${SUDO[@]}" apt-get $(apt_archive_opts) "$@"
+  local rc=$?
+  finalize_apt_cache
+  return "$rc"
 }
 
 remove_preinstalled_tool() {
@@ -133,13 +154,6 @@ install_minimal_packages() {
     "cmake-data=${archive_cmake_data}"
 
   "${SUDO[@]}" apt-mark hold cmake cmake-data >/dev/null
-
-  if [[ -n "$APT_CACHE_DIR" ]]; then
-    "${SUDO[@]}" rm -rf "$APT_CACHE_DIR/partial" "$APT_CACHE_DIR/lock"
-    if [[ "$(id -u)" -ne 0 ]]; then
-      "${SUDO[@]}" chown -R "$(id -u):$(id -g)" "$APT_CACHE_DIR"
-    fi
-  fi
 }
 
 verify_toolchain() {
@@ -163,8 +177,24 @@ verify_toolchain() {
 }
 
 main() {
+  local series
+  series="$(host_series)"
+  if [[ -z "$series" ]]; then
+    echo "error: could not detect host Ubuntu series" >&2
+    exit 1
+  fi
+
   add_swap
   strip_conflicting_runner_tools
+
+  # shellcheck source=.github/scripts/strip-third-party-apt-sources.sh
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/strip-third-party-apt-sources.sh"
+  strip_third_party_apt_sources
+
+  # shellcheck source=.github/scripts/normalize-runner-apt-sources.sh
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/normalize-runner-apt-sources.sh"
+  normalize_runner_apt_sources "$series"
+
   install_minimal_packages
   enable_deb_src
   verify_toolchain
