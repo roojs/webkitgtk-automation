@@ -63,47 +63,51 @@ strip_conflicting_runner_tools() {
   done
 }
 
-ubuntu_archive_source_file() {
-  local f="$1"
-  [[ -f "$f" ]] || return 1
-  grep -qE 'archive\.ubuntu\.com|azure\.archive\.ubuntu\.com|security\.ubuntu\.com|ports\.ubuntu\.com' "$f"
-}
-
-rewrite_sources_to_series() {
-  local from="$1" to="$2"
-  echo "==> rewriting Ubuntu archive apt sources $from → $to"
+remove_runner_apt_sources() {
+  echo "==> removing GHA runner apt sources (mirrorlist / azure / third-party)"
   local f
   shopt -s nullglob
-  for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
+  for f in /etc/apt/sources.list.d/*; do
     [[ -f "$f" ]] || continue
-    ubuntu_archive_source_file "$f" || continue
-    "${SUDO[@]}" sed -i \
-      -e "s/${from}/${to}/g" \
-      -e "s/${from}-security/${to}-security/g" \
-      -e "s/${from}-updates/${to}-updates/g" \
-      -e "s/${to}-security-security/${to}-security/g" \
-      -e "s/${to}-updates-updates/${to}-updates/g" \
-      "$f"
+    echo "    removing $f"
+    "${SUDO[@]}" rm -f "$f"
   done
   shopt -u nullglob
+  if [[ -f /etc/apt/sources.list ]]; then
+    "${SUDO[@]}" tee /etc/apt/sources.list >/dev/null <<'EOF'
+# Managed by webkitgtk-automation upgrade-runner-to-series.sh
+EOF
+  fi
+  if [[ -f /etc/apt/apt-mirrors.txt ]]; then
+    echo "    removing /etc/apt/apt-mirrors.txt"
+    "${SUDO[@]}" rm -f /etc/apt/apt-mirrors.txt
+  fi
+  "${SUDO[@]}" rm -rf /var/lib/apt/lists/*
+}
+
+write_ubuntu_archive_sources() {
+  local series="$1"
+  echo "==> writing Ubuntu archive sources for $series (archive.ubuntu.com only)"
+  "${SUDO[@]}" tee /etc/apt/sources.list.d/ubuntu.sources >/dev/null <<EOF
+Types: deb deb-src
+URIs: http://archive.ubuntu.com/ubuntu
+Suites: ${series} ${series}-updates ${series}-security
+Components: main universe restricted multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+EOF
+}
+
+apt_dist_upgrade() {
+  apt_get \
+    -o Acquire::AllowReleaseInfoChange=true \
+    -o Dpkg::Options::=--force-confdef \
+    -o Dpkg::Options::=--force-confold \
+    dist-upgrade -y
 }
 
 enable_deb_src() {
-  local f changed=0
-  for f in /etc/apt/sources.list.d/*.sources; do
-    [[ -f "$f" ]] || continue
-    if grep -q '^Types: deb$' "$f" && ! grep -q '^Types:.*deb-src' "$f"; then
-      "${SUDO[@]}" sed -i 's/^Types: deb$/Types: deb deb-src/' "$f"
-      changed=1
-    fi
-  done
-  if [[ -f /etc/apt/sources.list ]] && grep -qE '^#\s*deb-src ' /etc/apt/sources.list; then
-    "${SUDO[@]}" sed -i -E 's/^#\s*deb-src /deb-src /' /etc/apt/sources.list
-    changed=1
-  fi
-  if [[ "$changed" -eq 1 ]]; then
-    apt_get update -qq
-  fi
+  # write_ubuntu_archive_sources already enables deb-src via Types: deb deb-src
+  apt_get update -qq
 }
 
 install_orchestration_packages() {
@@ -126,18 +130,17 @@ install_orchestration_packages() {
   archive_cmake="$(apt-cache madison cmake 2>/dev/null | awk '/ubuntu/ { print $3; exit }')"
   archive_cmake_data="$(apt-cache madison cmake-data 2>/dev/null | awk -v want="$archive_cmake" '$3 == want { print $3; exit }')"
   if [[ -z "$archive_cmake" ]]; then
-    echo "error: could not resolve archive cmake version for $TARGET_SERIES" >&2
-    exit 1
+    echo "warning: could not pin archive cmake; installing cmake from archive" >&2
+    apt_get install -y --allow-downgrades "${pkgs[@]}" cmake cmake-data
+  else
+    [[ -n "$archive_cmake_data" ]] || archive_cmake_data="$archive_cmake"
+    echo "==> installing orchestration packages + archive cmake=${archive_cmake}"
+    apt_get install -y --allow-downgrades \
+      "${pkgs[@]}" \
+      "cmake=${archive_cmake}" \
+      "cmake-data=${archive_cmake_data}"
+    "${SUDO[@]}" apt-mark hold cmake cmake-data >/dev/null
   fi
-  [[ -n "$archive_cmake_data" ]] || archive_cmake_data="$archive_cmake"
-
-  echo "==> installing orchestration packages + archive cmake=${archive_cmake}"
-  apt_get install -y --allow-downgrades \
-    "${pkgs[@]}" \
-    "cmake=${archive_cmake}" \
-    "cmake-data=${archive_cmake_data}"
-
-  "${SUDO[@]}" apt-mark hold cmake cmake-data >/dev/null
 
   if [[ -n "$APT_CACHE_DIR" ]]; then
     "${SUDO[@]}" rm -rf "$APT_CACHE_DIR/partial" "$APT_CACHE_DIR/lock"
@@ -205,17 +208,19 @@ main() {
   strip_conflicting_runner_tools
   strip_third_party_apt_sources
   prepare_apt_cache_dir
+  remove_runner_apt_sources
+  write_ubuntu_archive_sources "$BASE_SERIES"
 
-  echo "==> pass 1: update/upgrade/dist-upgrade on $BASE_SERIES"
+  echo "==> pass 1: update/upgrade/dist-upgrade on $BASE_SERIES (archive.ubuntu.com)"
   apt_get update -qq
   apt_get upgrade -y
-  apt_get dist-upgrade -y
+  apt_dist_upgrade
 
-  rewrite_sources_to_series "$BASE_SERIES" "$TARGET_SERIES"
+  write_ubuntu_archive_sources "$TARGET_SERIES"
 
-  echo "==> pass 2: dist-upgrade to $TARGET_SERIES"
+  echo "==> pass 2: dist-upgrade to $TARGET_SERIES (archive.ubuntu.com)"
   apt_get update -qq
-  apt_get dist-upgrade -y
+  apt_dist_upgrade
 
   install_orchestration_packages
   enable_deb_src
