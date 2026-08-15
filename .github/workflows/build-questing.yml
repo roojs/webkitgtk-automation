@@ -77,7 +77,7 @@ jobs:
 
       - name: Free runner disk (remove unused SDKs)
         run: |
-          chmod +x .github/scripts/free-runner-disk.sh .github/scripts/work-cache.sh .github/scripts/upgrade-runner-to-series.sh .github/scripts/strip-third-party-apt-sources.sh
+          chmod +x .github/scripts/free-runner-disk.sh .github/scripts/work-cache.sh .github/scripts/upgrade-runner-to-series.sh .github/scripts/strip-third-party-apt-sources.sh .github/scripts/setup-ci-build-env.sh
           .github/scripts/free-runner-disk.sh
 
       - name: Upgrade runner noble → questing

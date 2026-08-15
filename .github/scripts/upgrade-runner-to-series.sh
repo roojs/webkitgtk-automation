@@ -136,9 +136,8 @@ apt_dist_upgrade() {
     -o Dpkg::Options::=--force-confold \
     dist-upgrade -y
   rc=$?
+  "${SUDO[@]}" dpkg --configure -a || true
   set -e
-
-  "${SUDO[@]}" dpkg --configure -a
 
   if [[ "$rc" -ne 0 ]]; then
     if "${SUDO[@]}" dpkg --audit 2>/dev/null | grep -q .; then
@@ -152,66 +151,23 @@ apt_dist_upgrade() {
   return "$rc"
 }
 
-enable_deb_src() {
-  # write_ubuntu_archive_sources already enables deb-src via Types: deb deb-src
+disable_needrestart() {
+  echo "==> disabling needrestart during release upgrade"
+  if dpkg -s needrestart >/dev/null 2>&1; then
+    apt_get purge -y needrestart || true
+  fi
+}
+
+setup_post_upgrade_build_env() {
+  local setup_script
+  setup_script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/setup-ci-build-env.sh"
+  if [[ ! -x "$setup_script" ]]; then
+    chmod +x "$setup_script"
+  fi
+  echo "==> post-upgrade apt update"
   apt_get update -qq
-}
-
-install_orchestration_packages() {
-  local archive_cmake archive_cmake_data
-  local -a pkgs=(
-    build-essential
-    ca-certificates
-    ccache
-    binutils-gold
-    devscripts
-    dpkg-dev
-    fakeroot
-    ninja-build
-    patch
-    quilt
-    ubuntu-dev-tools
-    zstd
-  )
-
-  archive_cmake="$(apt-cache madison cmake 2>/dev/null | awk '/ubuntu/ { print $3; exit }')"
-  archive_cmake_data="$(apt-cache madison cmake-data 2>/dev/null | awk -v want="$archive_cmake" '$3 == want { print $3; exit }')"
-  if [[ -z "$archive_cmake" ]]; then
-    echo "warning: could not pin archive cmake; installing cmake from archive" >&2
-    apt_get install -y --allow-downgrades "${pkgs[@]}" cmake cmake-data
-  else
-    [[ -n "$archive_cmake_data" ]] || archive_cmake_data="$archive_cmake"
-    echo "==> installing orchestration packages + archive cmake=${archive_cmake}"
-    apt_get install -y --allow-downgrades \
-      "${pkgs[@]}" \
-      "cmake=${archive_cmake}" \
-      "cmake-data=${archive_cmake_data}"
-    "${SUDO[@]}" apt-mark hold cmake cmake-data >/dev/null
-  fi
-}
-
-verify_toolchain() {
-  export PATH="/usr/bin:/bin:${PATH}"
-  hash -r
-
-  echo "==> toolchain after upgrade"
-  echo "    series: $(host_series) (target=$TARGET_SERIES)"
-  echo "    cmake: $(command -v cmake) ($(cmake --version | head -n 1))"
-  echo "    ninja: $(command -v ninja 2>/dev/null || echo missing)"
-
-  if [[ "$(host_series)" != "$TARGET_SERIES" ]]; then
-    echo "error: host series $(host_series) != TARGET_SERIES=$TARGET_SERIES after upgrade" >&2
-    exit 1
-  fi
-
-  if cmake --version | grep -qE 'cmake version 4\.4'; then
-    echo "error: cmake 4.4.x still active after upgrade" >&2
-    exit 1
-  fi
-
-  if [[ -n "${GITHUB_ENV:-}" && -w "${GITHUB_ENV}" ]]; then
-    echo "PATH=/usr/bin:/bin:${PATH}" >>"$GITHUB_ENV"
-  fi
+  echo "==> setup CI build environment on $TARGET_SERIES"
+  NEEDRESTART_SUSPEND=1 APT_CACHE_DIR="" "$setup_script"
 }
 
 add_swap() {
@@ -244,6 +200,7 @@ main() {
 
   echo "==> pass 1: update/upgrade/dist-upgrade on $BASE_SERIES (archive.ubuntu.com)"
   apt_get update -qq
+  disable_needrestart
   apt_get upgrade -y
   apt_dist_upgrade
 
@@ -261,9 +218,7 @@ main() {
     exit 1
   fi
 
-  install_orchestration_packages
-  enable_deb_src
-  verify_toolchain
+  setup_post_upgrade_build_env
 
   echo "==> upgrade-runner-to-series done ($(host_series))"
 }

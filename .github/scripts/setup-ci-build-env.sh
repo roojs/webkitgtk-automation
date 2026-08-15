@@ -118,8 +118,8 @@ install_minimal_packages() {
   echo "==> apt-get update (no dist-upgrade)"
   apt_get update -qq
 
-  archive_cmake="$(apt-cache madison cmake 2>/dev/null | awk '/ubuntu/ { print $3; exit }')"
-  archive_cmake_data="$(apt-cache madison cmake-data 2>/dev/null | awk -v want="$archive_cmake" '$3 == want { print $3; exit }')"
+  archive_cmake="$(apt-cache madison cmake 2>/dev/null | awk '/ubuntu/ { print $3; exit }' || true)"
+  archive_cmake_data="$(apt-cache madison cmake-data 2>/dev/null | awk -v want="$archive_cmake" '$3 == want { print $3; exit }' || true)"
   if [[ -z "$archive_cmake" ]]; then
     echo "error: could not resolve archive cmake version" >&2
     exit 1
