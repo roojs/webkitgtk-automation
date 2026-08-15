@@ -21,9 +21,7 @@ export NEEDRESTART_MODE=a
 export NEEDRESTART_SUSPEND=1
 
 TARGET_SERIES="${TARGET_SERIES:?TARGET_SERIES is required}"
-# Workspace apt cache is for build.sh only — dist-upgrade must use /var/cache/apt/archives.
-WORKSPACE_APT_CACHE_DIR="${APT_CACHE_DIR:-}"
-APT_CACHE_DIR=""
+APT_CACHE_DIR="${APT_CACHE_DIR:-}"
 
 # shellcheck source=scripts/lib/host-series.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/lib/host-series.sh"
@@ -48,8 +46,7 @@ apt_archive_opts() {
 }
 
 prepare_workspace_apt_cache() {
-  [[ -n "$WORKSPACE_APT_CACHE_DIR" ]] || return 0
-  APT_CACHE_DIR="$WORKSPACE_APT_CACHE_DIR"
+  [[ -n "$APT_CACHE_DIR" ]] || return 0
   mkdir -p "$APT_CACHE_DIR/partial"
   APT_CACHE_DIR="$(cd "$APT_CACHE_DIR" && pwd)"
   "${SUDO[@]}" chown -R _apt:root "$APT_CACHE_DIR"
@@ -57,24 +54,20 @@ prepare_workspace_apt_cache() {
 }
 
 finalize_workspace_apt_cache() {
-  [[ -n "$WORKSPACE_APT_CACHE_DIR" ]] || return 0
-  "${SUDO[@]}" rm -rf "$WORKSPACE_APT_CACHE_DIR/partial" "$WORKSPACE_APT_CACHE_DIR/lock" 2>/dev/null || true
+  [[ -n "$APT_CACHE_DIR" ]] || return 0
+  local cache_dir="$APT_CACHE_DIR"
+  "${SUDO[@]}" rm -rf "$cache_dir/partial" "$cache_dir/lock" 2>/dev/null || true
   if [[ "$(id -u)" -ne 0 ]]; then
-    "${SUDO[@]}" chown -R "$(id -u):$(id -g)" "$WORKSPACE_APT_CACHE_DIR"
+    "${SUDO[@]}" chown -R "$(id -u):$(id -g)" "$cache_dir"
   fi
-  APT_CACHE_DIR=""
 }
 
 apt_get() {
-  if [[ -n "$APT_CACHE_DIR" ]]; then
-    prepare_workspace_apt_cache
-  fi
+  prepare_workspace_apt_cache
   # shellcheck disable=SC2046
   "${SUDO[@]}" apt-get $(apt_archive_opts) "$@"
   local rc=$?
-  if [[ -n "$APT_CACHE_DIR" ]]; then
-    finalize_workspace_apt_cache
-  fi
+  finalize_workspace_apt_cache
   return "$rc"
 }
 
@@ -191,7 +184,11 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/strip-third-party-apt-sour
 
 main() {
   echo "==> upgrade-runner-to-series: $BASE_SERIES → $TARGET_SERIES"
-  echo "==> dist-upgrade uses system apt cache (not workspace cache)"
+  if [[ -n "$APT_CACHE_DIR" ]]; then
+    echo "==> dist-upgrade archives → $APT_CACHE_DIR"
+  else
+    echo "==> dist-upgrade uses system apt cache"
+  fi
   add_swap
   strip_conflicting_runner_tools
   strip_third_party_apt_sources

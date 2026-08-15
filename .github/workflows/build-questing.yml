@@ -80,12 +80,6 @@ jobs:
           chmod +x .github/scripts/free-runner-disk.sh .github/scripts/work-cache.sh .github/scripts/upgrade-runner-to-series.sh .github/scripts/strip-third-party-apt-sources.sh .github/scripts/setup-ci-build-env.sh
           .github/scripts/free-runner-disk.sh
 
-      - name: Upgrade runner noble → questing
-        env:
-          TARGET_SERIES: ${{ env.SERIES }}
-          BASE_SERIES: noble
-        run: .github/scripts/upgrade-runner-to-series.sh
-
       - name: Restore apt package cache
         id: restore-apt
         uses: actions/cache/restore@v5
@@ -104,6 +98,13 @@ jobs:
             sudo chown -R _apt:root "${{ env.APT_CACHE_DIR }}"
             sudo chmod -R u+rwX,g+rwX "${{ env.APT_CACHE_DIR }}"
           fi
+
+      - name: Upgrade runner noble → questing
+        env:
+          TARGET_SERIES: ${{ env.SERIES }}
+          BASE_SERIES: noble
+          APT_CACHE_DIR: ${{ env.APT_CACHE_DIR }}
+        run: .github/scripts/upgrade-runner-to-series.sh
 
       - name: Restore ccache
         uses: actions/cache/restore@v5
