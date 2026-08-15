@@ -1,0 +1,8 @@
+# Ubuntu series → packaging layout and patch file.
+# Layouts:
+#   soup3-gtk4  — ENABLE_SOUP2/SOUP3/GTK4 toggles (noble, questing, …)
+#   gtk3-gtk4   — ENABLE_GTK3/GTK4 toggles (resolute, …)
+# Add a row when a new Ubuntu release diverges; bump pinned-webkit-version too.
+noble=soup3-gtk4:enable-webdriver-gtk4-soup3.patch
+questing=soup3-gtk4:enable-webdriver-gtk4-soup3.patch
+resolute=gtk3-gtk4:enable-webdriver-gtk4.patch

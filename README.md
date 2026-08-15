@@ -19,8 +19,9 @@ Builds are **native** (no Docker). `SERIES` must match the machine’s Ubuntu re
 
 | Where | Series |
 |-------|--------|
-| GitHub Actions (`ubuntu-26.04`) | **resolute** (26.04 LTS) |
-| Local | whatever you are running (`./build.sh` defaults to the host codename) |
+| GitHub Actions — **questing** (`build-questing-*` tags) | **questing** (25.10) — noble runner upgraded in CI |
+| GitHub Actions — **resolute** (`build-resolute-*` tags) | **resolute** (26.04) — native on `ubuntu-26.04` |
+| Local | whatever you are running if listed in `.github/series-registry` |
 
 ## Install from a Release
 
@@ -92,7 +93,7 @@ CLEAN=1 CLEAN_CACHE=1 ./build.sh
 
 | Knob | Plain meaning |
 |------|----------------|
-| **GTK4-only** (`ENABLE_GTK3=NO`) | Ubuntu normally compiles WebKit twice (4.1 + 6.0). We only need 6.0, so we skip the gtk3 build (~half the work). |
+| **GTK4-only** | Ubuntu normally compiles WebKit for soup3/4.1 and gtk4/6.0 (or gtk3+gtk4 on resolute). We only need 6.0, so we skip the other build (~half the work). Layout depends on series — see `.github/series-registry`. |
 | **`noautodbgsym`** | Do not emit separate `*-dbgsym` / `.ddeb` packages. |
 | **`-g0`** | Do not embed debug info in object files. |
 | **Gold linker** (`-fuse-ld=gold`) | Use `binutils-gold` (`ld.gold`) for lower peak RAM than `ld.bfd` when linking JSC. Strip BFD-only `-Wl,--reduce-memory-overheads` (gold/lld reject or mangle it). |
@@ -100,28 +101,52 @@ CLEAN=1 CLEAN_CACHE=1 ./build.sh
 
 ## Build on GitHub Actions
 
-### Tag and walk away (preferred)
+Series, patch file, and packaging layout are centralized in `.github/series-registry`:
 
-Push a `build-*` tag — that starts the workflow. When it finishes, the `.deb`s are on that tag’s **Release**.
-
-```bash
-git tag build-$(date +%Y%m%d)
-git push origin build-$(date +%Y%m%d)
-# sleep / check Releases later — no need to babysit Actions
+```
+noble=soup3-gtk4:enable-webdriver-gtk4-soup3.patch
+questing=soup3-gtk4:enable-webdriver-gtk4-soup3.patch
+resolute=gtk3-gtk4:enable-webdriver-gtk4.patch
 ```
 
-Examples: `build-20260814`, `build-resolute-1`.
+### Questing (25.10) — preferred for Ubuntu 25.10 installs
+
+Push a `build-questing-*` tag:
+
+```bash
+git tag build-questing-$(date +%Y%m%d)
+git push origin build-questing-$(date +%Y%m%d)
+```
+
+Workflow: **Build libwebkitgtk-6.0 (25.10 questing)** (`.github/workflows/build-questing.yml`).
+
+Runs on `ubuntu-24.04` (noble), dist-upgrades the runner to **questing**, then builds natively. Apt cache under `.ci-cache/apt-questing`.
+
+### Resolute (26.04)
+
+Push a `build-resolute-*` tag (not bare `build-*` — that pattern is questing-only):
+
+```bash
+git tag build-resolute-$(date +%Y%m%d)
+git push origin build-resolute-$(date +%Y%m%d)
+```
+
+Workflow: **Build libwebkitgtk-6.0 with WebDriver** (`.github/workflows/build.yml`).
+
+Native on `ubuntu-26.04`. Resolute CI currently fails at CMake configure (GHA CMake 4.4 vs WebKit 2.52.3) — out of scope here.
+
+When a workflow finishes, the `.deb`s are on that tag's **Release**.
 
 ### Manual run
 
-**Actions → Build libwebkitgtk-6.0 with WebDriver → Run workflow** (same pipeline).
+**Actions →** pick the questing or resolute workflow → **Run workflow**.
 
-Native on `ubuntu-26.04` (**resolute**). No Docker. Flow:
+Native build flow (series-specific runner setup differs):
 
 1. Checkout
-2. **Pretest** — `scripts/pretest-patch.sh` (patch must apply; fails fast)
+2. **Pretest** — `scripts/test-build-scripts.sh` / `pretest-patch.sh` (patch must apply; fails fast)
 3. **Free runner disk** — strip unused SDKs and GHA preinstalled tools
-4. **Setup minimal build env** — swap, archive `cmake` only (no `apt-get upgrade`), orchestration packages
+4. **Setup** — questing: noble→questing dist-upgrade + orchestration packages; resolute: minimal env + archive cmake
 5. Restore **apt**, **ccache**, and **work** caches
 6. Unpack work tree if present (resumes `build-gtk4` via `build.sh` `-nc`)
 7. `./build.sh` (pinned `webkit2gtk` source + `build-dep` only)
@@ -147,13 +172,13 @@ Manual `workflow_dispatch` inputs:
 | Path | Role |
 |------|------|
 | `scripts/pretest-patch.sh` | Dry-run patch against series `debian/rules` (no compile) |
-| `patches/enable-webdriver-gtk4.patch` | WebDriver GTK4 + CI resource / ccache / install fixes |
-| `build.sh` | Native fetch → patch → resumable `dpkg-buildpackage` → `dist/` |
-| `.github/pinned-webkit-version` | Pinned `webkit2gtk` source version per series |
-| `.github/scripts/setup-ci-build-env.sh` | Minimal CI base: swap, strip GHA tools, archive cmake, orchestration pkgs |
-| `.github/scripts/free-runner-disk.sh` | Thorough hosted-runner cleanup |
-| `.github/scripts/work-cache.sh` | Pack/unpack `work/` for incremental CI resume |
-| `.github/workflows/build.yml` | Cleanup, apt upgrade+cache, work/ccache, Release |
+| `patches/enable-webdriver-gtk4.patch` | WebDriver GTK4 patch (resolute / gtk3-gtk4 layout) |
+| `patches/enable-webdriver-gtk4-soup3.patch` | WebDriver GTK4 patch (noble/questing / soup3-gtk4 layout) |
+| `.github/series-registry` | Maps Ubuntu series → layout + patch file |
+| `scripts/lib/series-registry.sh` | Parse registry; resolve patch and build tags |
+| `.github/scripts/upgrade-runner-to-series.sh` | CI: dist-upgrade runner to target series (questing) |
+| `.github/workflows/build-questing.yml` | Questing build (noble runner → 25.10 upgrade → Release) |
+| `.github/workflows/build.yml` | Resolute build (26.04 native → Release) |
 | `cache/ccache` | Persistent compiler cache (gitignored) |
 | `.ci-cache/apt` | Apt `.deb` archives for CI (gitignored) |
 | `.ci-cache/work` | Packed work tree for resume (gitignored) |

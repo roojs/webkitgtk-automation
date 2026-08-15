@@ -9,24 +9,23 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PATCH="$REPO_ROOT/patches/enable-webdriver-gtk4.patch"
 COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
 MARKER_NAME=".webkitgtk-automation-prepared"
 # shellcheck source=scripts/lib/debian-tarball.sh
 source "$REPO_ROOT/scripts/lib/debian-tarball.sh"
 # shellcheck source=scripts/lib/pinned-webkit-version.sh
 source "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh"
-
-host_series() {
-  if [[ -r /etc/os-release ]]; then
-    # shellcheck disable=SC1091
-    . /etc/os-release
-    echo "${VERSION_CODENAME:-}"
-  fi
-}
+# shellcheck source=scripts/lib/host-series.sh
+source "$REPO_ROOT/scripts/lib/host-series.sh"
+# shellcheck source=scripts/lib/series-registry.sh
+source "$REPO_ROOT/scripts/lib/series-registry.sh"
+# shellcheck source=scripts/lib/packaging-checks.sh
+source "$REPO_ROOT/scripts/lib/packaging-checks.sh"
 
 SERIES="${SERIES:-$(host_series)}"
 SERIES="${SERIES:-resolute}"
+LAYOUT="$(series_layout "$SERIES")"
+PATCH="$(patch_file_for_series "$SERIES")"
 
 pass() { echo "  ok: $*"; }
 fail() { echo "FAIL: $*" >&2; exit 1; }
@@ -57,10 +56,15 @@ test_shell_syntax() {
     "$REPO_ROOT/scripts/monitor-upstream-build.sh" \
     "$REPO_ROOT/scripts/lib/debian-tarball.sh" \
     "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh" \
+    "$REPO_ROOT/scripts/lib/host-series.sh" \
+    "$REPO_ROOT/scripts/lib/series-registry.sh" \
+    "$REPO_ROOT/scripts/lib/packaging-checks.sh" \
+    "$REPO_ROOT/scripts/lib/patch-for-series.sh" \
     "$REPO_ROOT/scripts/test-build-scripts.sh" \
     "$REPO_ROOT/.github/scripts/work-cache.sh" \
     "$REPO_ROOT/.github/scripts/free-runner-disk.sh" \
-    "$REPO_ROOT/.github/scripts/setup-ci-build-env.sh"
+    "$REPO_ROOT/.github/scripts/setup-ci-build-env.sh" \
+    "$REPO_ROOT/.github/scripts/upgrade-runner-to-series.sh"
   do
     bash -n "$f" || fail "bash -n $f"
     pass "$(basename "$f")"
@@ -73,9 +77,9 @@ test_compile_cache_key_pipefail() {
   (
     set -euo pipefail
     key="$(read_compile_cache_key "$COMPILE_CACHE_KEY_FILE")"
-    [[ "$key" == "v3" ]] || exit 1
-  ) || fail "expected compile cache key v3 under pipefail"
-  pass "key=v3"
+    [[ "$key" == "v4" ]] || exit 1
+  ) || fail "expected compile cache key v4 under pipefail"
+  pass "key=v4"
 
   echo "==> compile-cache-key regression (broken tr|grep pipeline must fail)"
   if (
@@ -115,10 +119,10 @@ test_marker_matching() {
   cat >"$marker" <<EOF
 SERIES=resolute
 SUFFIX=+webkitgtk1
-COMPILE_CACHE_KEY=v3
+COMPILE_CACHE_KEY=v4
 PATCH_SHA256=abc
 EOF
-  marker_matches "$marker" resolute '+webkitgtk1' v3 || fail "new marker should match"
+  marker_matches "$marker" resolute '+webkitgtk1' v4 || fail "new marker should match"
   marker_matches "$marker" resolute '+webkitgtk1' v2 && fail "wrong compile key should not match"
   pass "new marker"
 
@@ -127,7 +131,7 @@ SERIES=resolute
 SUFFIX=+webkitgtk1
 PATCH_SHA256=abc
 EOF
-  marker_matches "$marker" resolute '+webkitgtk1' v3 || fail "legacy marker should match"
+  marker_matches "$marker" resolute '+webkitgtk1' v4 || fail "legacy marker should match"
   pass "legacy marker"
   trap - RETURN
 }
@@ -181,7 +185,7 @@ install_test_deps() {
 }
 
 test_packaging_flow() {
-  echo "==> packaging flow (patch, control regen, gtk4-only)"
+  echo "==> packaging flow (patch, control regen, gtk4-only, layout=$LAYOUT)"
   local tmp src deb_tar patched_hash restored_hash
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-packaging.XXXXXX")"
   src="$tmp/src"
@@ -197,24 +201,15 @@ test_packaging_flow() {
   pass "patch applies"
 
   patched_hash="$(sha256sum "$src/debian/rules" | awk '{print $1}')"
+  assert_patched_rules_markers "$src/debian/rules" "$LAYOUT"
 
   (
     cd "$src"
     rm -f debian/control
     fakeroot debian/rules debian/control >/dev/null
   )
-  [[ -f "$src/debian/control" ]] || fail "debian/control not generated"
-  grep -q '^Package: libwebkitgtk-6.0-4$' "$src/debian/control" || fail "gtk4 runtime package missing from control"
-  if grep -q '^Package: libwebkit2gtk-4.1' "$src/debian/control"; then
-    fail "gtk3 binary packages should be absent from regenerated control"
-  fi
+  assert_patched_control_gtk4_only "$src/debian/control" "$LAYOUT"
   pass "debian/control gtk4-only"
-
-  # gtk4-only control must not use -N for gtk3 packages that are not listed.
-  if grep -q -- '-Nlibwebkit2gtk-4.1-0' "$src/debian/rules"; then
-    fail "patched debian/rules must not -N gtk3 packages when ENABLE_GTK3=NO"
-  fi
-  pass "no invalid gtk3 -N skip flags"
 
   # Simulate refresh_debian_rules_from_patch (build.sh resume path).
   echo "# stale" >>"$src/debian/rules"
@@ -297,7 +292,7 @@ test_work_cache_roundtrip() {
   cat >"$src/$MARKER_NAME" <<EOF
 SERIES=resolute
 SUFFIX=+webkitgtk1
-COMPILE_CACHE_KEY=v3
+COMPILE_CACHE_KEY=v4
 PATCH_SHA256=dummy
 EOF
 
@@ -333,7 +328,7 @@ test_upstream_version_probe() {
 }
 
 main() {
-  echo "==> test-build-scripts series=$SERIES"
+  echo "==> test-build-scripts series=$SERIES layout=$LAYOUT"
   [[ -f "$PATCH" ]] || fail "missing $PATCH"
   [[ -f "$COMPILE_CACHE_KEY_FILE" ]] || fail "missing $COMPILE_CACHE_KEY_FILE"
 

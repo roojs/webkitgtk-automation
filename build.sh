@@ -17,20 +17,20 @@
 #   - GTK4-only build (gtk3 skipped); system webkitgtk-webdriver is kept
 set -euo pipefail
 
-host_series() {
-  if [[ -r /etc/os-release ]]; then
-    # shellcheck disable=SC1091
-    . /etc/os-release
-    echo "${VERSION_CODENAME:-}"
-  fi
-}
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/lib/host-series.sh
+source "$REPO_ROOT/scripts/lib/host-series.sh"
+# shellcheck source=scripts/lib/series-registry.sh
+source "$REPO_ROOT/scripts/lib/series-registry.sh"
 
 HOST_SERIES="$(host_series)"
-DEFAULT_SERIES="${HOST_SERIES:-resolute}"
+DEFAULT_SERIES="$HOST_SERIES"
+if [[ -z "$DEFAULT_SERIES" ]] || ! series_registered "$DEFAULT_SERIES"; then
+  DEFAULT_SERIES="resolute"
+fi
 SERIES="${SERIES:-${1:-$DEFAULT_SERIES}}"
 SUFFIX="${SUFFIX:-${2:-+webkitgtk1}}"
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PATCH="$REPO_ROOT/patches/enable-webdriver-gtk4.patch"
+PATCH="$(patch_file_for_series "$SERIES")"
 COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
 # shellcheck source=scripts/lib/debian-tarball.sh
 source "$REPO_ROOT/scripts/lib/debian-tarball.sh"

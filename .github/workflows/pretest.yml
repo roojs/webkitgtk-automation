@@ -10,6 +10,7 @@ on:
       - "build.sh"
       - ".github/workflows/pretest.yml"
       - ".github/workflows/build.yml"
+      - ".github/workflows/build-questing.yml"
       - ".github/workflows/monitor-upstream.yml"
   pull_request:
     paths:
@@ -19,24 +20,28 @@ on:
       - "build.sh"
       - ".github/workflows/pretest.yml"
       - ".github/workflows/build.yml"
+      - ".github/workflows/build-questing.yml"
       - ".github/workflows/monitor-upstream.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
-env:
-  SERIES: resolute
-
 jobs:
   pretest:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        series: [questing, resolute]
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
 
       - name: Test build scripts (no WebKit compile)
+        env:
+          SERIES: ${{ matrix.series }}
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq devscripts zstd binutils-gold

@@ -1,0 +1,78 @@
+--- a/debian/rules	2026-08-15 07:05:47.123621232 +0000
++++ questing-rules.patched	2026-08-15 07:05:47.203629204 +0000
+@@ -6,19 +6,23 @@
+ include /usr/share/dpkg/buildflags.mk
+ 
+ export CCACHE_NOHASHDIR=1
+-export CCACHE_DIR=$(CURDIR)/ccache
++# Allow callers (webkitgtk-automation) to point at a persistent cache outside the tree.
++CCACHE_DIR ?= $(CURDIR)/ccache
++export CCACHE_DIR
+ 
+ # soup2 build -> 4.0 API packages
+ # soup3 build -> 4.1 API packages
+ # gtk4 build  -> 6.0 API packages
+ ENABLE_SOUP2=NO
+-ENABLE_SOUP3=YES
++ENABLE_SOUP3=NO
+ ENABLE_GTK4=YES
+ # If YES, build libwebkit2gtk-4.0-doc, libjavascriptcoregtk-4.0-bin and webkit2gtk-driver
+ # If NO, build libwebkitgtk-doc, libjavascriptcoregtk-bin and webkitgtk-webdriver
+ USE_OLD_PKG_NAMES=NO
+ 
+ EXTRA_DH_ARGUMENTS =
++# webkitgtk-automation: ship libwebkitgtk-6.0 only; keep system webkitgtk-webdriver.
++EXTRA_DH_ARGUMENTS += -Nlibwebkitgtk-doc
+ EXTRA_CMAKE_ARGUMENTS = -DPORT=GTK \
+ 	   -DCMAKE_INSTALL_LIBEXECDIR=lib/$(DEB_HOST_MULTIARCH) \
+ 	   -DCMAKE_C_FLAGS_RELEASE="" \
+@@ -59,11 +63,14 @@
+ 
+ # The debug packages produced by webkit are huge and cause problems in
+ # most buildds. Use -g1 in all architectures to make them smaller.
+-CFLAGS := $(CFLAGS:-g=-g1)
+-CXXFLAGS := $(CXXFLAGS:-g=-g1)
++# webkitgtk-automation: skip debug info in objects; pair with DEB_BUILD_OPTIONS=noautodbgsym.
++CFLAGS := $(CFLAGS:-g=-g0)
++CXXFLAGS := $(CXXFLAGS:-g=-g0)
+ 
+ # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=949621
+-LDFLAGS += -Wl,--reduce-memory-overheads
++# webkitgtk-automation: omit BFD-only reduce-memory overheads; use gold.
++LDFLAGS += -fuse-ld=gold
++export LDFLAGS
+ 
+ # Don't build with -gsplit-dwarf (see #1016936)
+ EXTRA_CMAKE_ARGUMENTS += -DDEBUG_FISSION=OFF
+@@ -209,6 +216,11 @@
+ 	WEBDRIVER_DEP_PKG = libwebkitgtk-6.0-4
+ endif
+ 
++# WebKit #318171: compile INTERACTIONS into libwebkitgtk-6.0.
++# Installed WebKitWebDriver binary still comes from the system package when soup3 is off.
++ifeq ($(ENABLE_GTK4),YES)
++	ENABLE_WEBDRIVER_GTK4 = -DENABLE_WEBDRIVER=ON
++endif
+ # The debhelper files for the soup2, soup3 and gtk4 builds are identical
+ # (apart from the API version) so we generate the last two from the first.
+ WEBKIT_DH_FILES = \
+@@ -344,7 +356,8 @@
+ 		dh_auto_build -Bbuild-soup2 $(EXTRA_BUILD_ARGUMENTS)
+ 	$(SOUP3_BUILD) CCACHE_BASEDIR=$(CURDIR)/build-soup3 \
+ 		dh_auto_build -Bbuild-soup3 $(EXTRA_BUILD_ARGUMENTS)
+-	$(GTK4_BUILD) dh_auto_build -Bbuild-gtk4 $(EXTRA_BUILD_ARGUMENTS)
++	$(GTK4_BUILD) CCACHE_BASEDIR=$(CURDIR)/build-gtk4 \
++		dh_auto_build -Bbuild-gtk4 $(EXTRA_BUILD_ARGUMENTS)
+ 
+ override_dh_auto_install:
+ 	$(SOUP2_BUILD) dh_auto_install -Bbuild-soup2
+@@ -357,7 +370,8 @@
+ 	$(GTK4_BUILD)  dh_auto_clean -Bbuild-gtk4
+ 	find Source Tools -type f -name "*.pyc" -exec rm {} \;
+ 	find Source Tools -depth -type d -name __pycache__ -exec rmdir {} \;
+-	rm -rf ccache
++	# Only remove an in-tree cache; leave an external CCACHE_DIR alone.
++	if [ "$(CCACHE_DIR)" = "$(CURDIR)/ccache" ] || [ "$(CCACHE_DIR)" = "ccache" ]; then rm -rf ccache; fi
+ 
+ # Create a dummy doc directory in case the "nodoc" build option is set.
+ override_dh_install-indep:

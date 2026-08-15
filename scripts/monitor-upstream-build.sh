@@ -13,6 +13,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=scripts/lib/pinned-webkit-version.sh
 source "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh"
+# shellcheck source=scripts/lib/series-registry.sh
+source "$REPO_ROOT/scripts/lib/series-registry.sh"
 SERIES="${SERIES:-resolute}"
 TRACKED_FILE="$REPO_ROOT/.github/tracked-upstream-version"
 PENDING_FILE="$REPO_ROOT/.github/pending-upstream-version"
@@ -36,6 +38,11 @@ EOF
 sanitize_tag_suffix() {
   # GitHub tag names: avoid +, spaces, etc.
   echo "$1" | tr '+/' '--'
+}
+
+upstream_build_tag() {
+  local version="$1"
+  build_release_tag "$SERIES" "upstream-$(sanitize_tag_suffix "$version")"
 }
 
 current="$("$REPO_ROOT/scripts/upstream-webkit-version.sh" "$SERIES")"
@@ -71,14 +78,14 @@ chmod +x "$REPO_ROOT/scripts/test-build-scripts.sh" "$REPO_ROOT/scripts/pretest-
 SERIES="$SERIES" "$REPO_ROOT/scripts/test-build-scripts.sh"
 
 if [[ "${DRY_RUN:-}" == "1" ]]; then
-  tag="build-upstream-$(sanitize_tag_suffix "$current")"
+  tag="$(upstream_build_tag "$current")"
   echo "==> DRY_RUN=1: would set pending=$current and push tag $tag"
   exit 0
 fi
 
 write_state_file "$PENDING_FILE" "$current" "# Upstream webkit2gtk version queued for an in-flight auto-build (empty = none)."
 
-tag="build-upstream-$(sanitize_tag_suffix "$current")"
+tag="$(upstream_build_tag "$current")"
 if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
   echo "==> tag $tag already exists; leaving pending=$current and exiting"
   git add "$PENDING_FILE"

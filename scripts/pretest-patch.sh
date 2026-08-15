@@ -1,30 +1,27 @@
 #!/usr/bin/env bash
-# Preflight: prove patches/enable-webdriver-gtk4.patch applies to the Ubuntu
-# webkit2gtk debian/rules for SERIES — without compiling WebKit.
+# Preflight: prove the series patch applies to Ubuntu webkit2gtk debian/rules — no compile.
 #
 # Usage:
 #   ./scripts/pretest-patch.sh           # host series (or SERIES=…)
-#   ./scripts/pretest-patch.sh noble
+#   ./scripts/pretest-patch.sh questing
 #
 # Exit 0 = patch applies cleanly. Exit non-zero = do not start a full build.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PATCH="$REPO_ROOT/patches/enable-webdriver-gtk4.patch"
-
-host_series() {
-  if [[ -r /etc/os-release ]]; then
-    # shellcheck disable=SC1091
-    . /etc/os-release
-    echo "${VERSION_CODENAME:-}"
-  fi
-}
-
+# shellcheck source=scripts/lib/host-series.sh
+source "$REPO_ROOT/scripts/lib/host-series.sh"
+# shellcheck source=scripts/lib/series-registry.sh
+source "$REPO_ROOT/scripts/lib/series-registry.sh"
+# shellcheck source=scripts/lib/packaging-checks.sh
+source "$REPO_ROOT/scripts/lib/packaging-checks.sh"
 # shellcheck source=scripts/lib/pinned-webkit-version.sh
 source "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh"
 
 SERIES="${SERIES:-${1:-$(host_series)}}"
 SERIES="${SERIES:-resolute}"
+LAYOUT="$(series_layout "$SERIES")"
+PATCH="$(patch_file_for_series "$SERIES")"
 PINNED_WEBKIT_VERSION="$(read_pinned_webkit_version "$SERIES")"
 
 if [[ ! -f "$PATCH" ]]; then
@@ -34,16 +31,13 @@ fi
 
 export DEBIAN_FRONTEND=noninteractive
 
-echo "==> pretest series=$SERIES (pinned webkit2gtk $PINNED_WEBKIT_VERSION)"
+echo "==> pretest series=$SERIES layout=$LAYOUT (pinned webkit2gtk $PINNED_WEBKIT_VERSION)"
 echo "==> patch=$PATCH"
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-pretest.XXXXXX")"
 cleanup() { rm -rf "$TMP"; }
 trap cleanup EXIT
 
-# Always fetch the published package for SERIES via a temporary deb-src list.
-# Never prefer host apt indexes (wrong series / wrong package pin).
-# Launchpad tip is fallback only — it can drift from the published package.
 fetch_rules_via_archive_apt() {
   local sources="$TMP/webkitgtk-deb-src.list"
   local lists="$TMP/apt-lists"
@@ -108,7 +102,7 @@ echo "==> dry-run patch -p1"
   cd "$TMP/src"
   if ! patch -p1 --dry-run < "$PATCH"; then
     echo "error: patch does not apply to $SERIES debian/rules" >&2
-    echo "       regenerate patches/enable-webdriver-gtk4.patch against that series." >&2
+    echo "       regenerate $(basename "$PATCH") against that series." >&2
     exit 1
   fi
 )
@@ -117,15 +111,7 @@ echo "==> applying for real (temp tree only) to confirm"
 (
   cd "$TMP/src"
   patch -p1 < "$PATCH" >/dev/null
-  # Spot-check critical markers landed.
-  grep -q 'ENABLE_WEBDRIVER_GTK4 = -DENABLE_WEBDRIVER=ON' debian/rules
-  grep -q 'ENABLE_GTK3=NO' debian/rules
-  grep -q 'fuse-ld=gold' debian/rules
-  ! grep -q 'reduce-memory-overheads' debian/rules
-  ! grep -q 'fuse-ld=lld' debian/rules
-  grep -q -- '-Nlibwebkitgtk-doc' debian/rules
-  grep -q 'libwebkitgtk-doc' debian/rules
-  ! grep -q -- '-Nlibwebkit2gtk-4.1-0' debian/rules
+  assert_patched_rules_markers "$TMP/src/debian/rules" "$LAYOUT"
 )
 
 echo "==> linker smoke check (gold)"

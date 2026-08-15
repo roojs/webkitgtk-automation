@@ -1,11 +1,11 @@
-name: Build libwebkitgtk-6.0 with WebDriver
+name: Build libwebkitgtk-6.0 (25.10 questing)
 
-# Fire-and-forget: push a build-resolute-* tag, go away; .debs land on that tag's Release.
-# Manual runs still work via workflow_dispatch.
+# Native questing build: start on ubuntu-24.04 (noble), dist-upgrade to 25.10, then compile.
+# Trigger: build-questing-* tags or workflow_dispatch.
 on:
   push:
     tags:
-      - "build-resolute-*"
+      - "build-questing-*"
   workflow_dispatch:
     inputs:
       suffix:
@@ -37,22 +37,18 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  APT_CACHE_DIR: .ci-cache/apt
+  APT_CACHE_DIR: .ci-cache/apt-questing
   WORK_CACHE_DIR: .ci-cache/work
-  # Native build on the runner image — must match runs-on.
-  SERIES: resolute
-  # workflow_dispatch inputs are empty on tag pushes — fall back to defaults.
+  SERIES: questing
   SUFFIX: ${{ github.event.inputs.suffix || '+webkitgtk1' }}
   CLEAN: ${{ github.event.inputs.clean == 'true' && '1' || '0' }}
   CLEAN_CACHE: ${{ github.event.inputs.clean_cache == 'true' && '1' || '0' }}
   REFRESH_APT: ${{ github.event.inputs.refresh_apt_cache == 'true' && '1' || '0' }}
-  # Tag that triggered the build (empty for manual runs).
   TRIGGER_TAG: ${{ github.event_name == 'push' && github.ref_type == 'tag' && github.ref_name || '' }}
 
 jobs:
-  # Cheap gate: patch must apply to this series' debian/rules before we spend hours.
   pretest:
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Check out repository
@@ -69,9 +65,7 @@ jobs:
 
   build:
     needs: pretest
-    # Prefer a large/self-hosted runner if available. Hosted runners persist
-    # apt + ccache + packed work/ (build-gtk4) when under the cache size budget.
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 360
 
     steps:
@@ -80,24 +74,33 @@ jobs:
 
       - name: Free runner disk (remove unused SDKs)
         run: |
-          chmod +x .github/scripts/free-runner-disk.sh .github/scripts/work-cache.sh .github/scripts/setup-ci-build-env.sh
+          chmod +x .github/scripts/free-runner-disk.sh .github/scripts/work-cache.sh .github/scripts/upgrade-runner-to-series.sh
           .github/scripts/free-runner-disk.sh
-
-      - name: Setup minimal build environment
-        env:
-          APT_CACHE_DIR: ${{ env.APT_CACHE_DIR }}
-        run: .github/scripts/setup-ci-build-env.sh
 
       - name: Restore apt package cache
         id: restore-apt
         uses: actions/cache/restore@v5
         with:
           path: ${{ env.APT_CACHE_DIR }}
-          key: apt-webkitgtk-v1-${{ env.REFRESH_APT == '1' && github.run_id || 'stable' }}-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/setup-ci-build-env.sh', 'build.sh') }}
+          key: apt-webkitgtk-v1-${{ env.REFRESH_APT == '1' && github.run_id || 'stable' }}-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build-questing.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/upgrade-runner-to-series.sh', 'build.sh') }}
           restore-keys: |
             apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-
             apt-webkitgtk-v1-stable-${{ env.SERIES }}-
             apt-webkitgtk-v1-
+
+      - name: Upgrade runner noble → questing
+        env:
+          TARGET_SERIES: ${{ env.SERIES }}
+          BASE_SERIES: noble
+          APT_CACHE_DIR: ${{ env.APT_CACHE_DIR }}
+        run: .github/scripts/upgrade-runner-to-series.sh
+
+      - name: Save apt package cache
+        if: always() && steps.restore-apt.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ env.APT_CACHE_DIR }}
+          key: apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build-questing.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/upgrade-runner-to-series.sh', 'build.sh') }}
 
       - name: Restore ccache
         uses: actions/cache/restore@v5
@@ -107,7 +110,7 @@ jobs:
           key: ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
           restore-keys: |
             ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/compile-cache-key') }}-
-            ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-
+            ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('patches/enable-webdriver-gtk4-soup3.patch') }}-
             ccache-${{ env.SERIES }}-${{ runner.arch }}-
             ccache-${{ env.SERIES }}-
 
@@ -120,7 +123,7 @@ jobs:
           key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
           restore-keys: |
             work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('.github/compile-cache-key') }}-
-            work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-
+            work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('patches/enable-webdriver-gtk4-soup3.patch') }}-
             work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-
             work-${{ env.SERIES }}-${{ runner.arch }}-
 
@@ -170,13 +173,6 @@ jobs:
           path: ${{ env.WORK_CACHE_DIR }}
           key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
 
-      - name: Save apt package cache
-        if: always() && steps.restore-apt.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v5
-        with:
-          path: ${{ env.APT_CACHE_DIR }}
-          key: apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/setup-ci-build-env.sh', 'build.sh') }}
-
       - name: Save ccache
         if: ${{ always() && (steps.build.outcome == 'success' || steps.build.outcome == 'failure' || steps.build.outcome == 'cancelled') }}
         uses: actions/cache/save@v5
@@ -219,11 +215,9 @@ jobs:
           "
 
           if [[ -n "${TRIGGER_TAG}" ]]; then
-            # Tag-triggered: attach .debs to the precursor tag's Release.
             RELEASE_TAG="${TRIGGER_TAG}"
             TITLE="${TRIGGER_TAG} (${VERSION})"
           else
-            # Manual run: version-derived release tag (sanitize + for GitHub).
             RELEASE_TAG="webkit2gtk-${VERSION//+/-}"
             TITLE="webkit2gtk-${VERSION}"
           fi
