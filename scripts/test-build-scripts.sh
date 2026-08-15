@@ -64,7 +64,8 @@ test_shell_syntax() {
     "$REPO_ROOT/.github/scripts/work-cache.sh" \
     "$REPO_ROOT/.github/scripts/free-runner-disk.sh" \
     "$REPO_ROOT/.github/scripts/setup-ci-build-env.sh" \
-    "$REPO_ROOT/.github/scripts/upgrade-runner-to-series.sh"
+    "$REPO_ROOT/.github/scripts/upgrade-runner-to-series.sh" \
+    "$REPO_ROOT/.github/scripts/strip-third-party-apt-sources.sh"
   do
     bash -n "$f" || fail "bash -n $f"
     pass "$(basename "$f")"

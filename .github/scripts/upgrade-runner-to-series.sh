@@ -63,12 +63,20 @@ strip_conflicting_runner_tools() {
   done
 }
 
+ubuntu_archive_source_file() {
+  local f="$1"
+  [[ -f "$f" ]] || return 1
+  grep -qE 'archive\.ubuntu\.com|azure\.archive\.ubuntu\.com|security\.ubuntu\.com|ports\.ubuntu\.com' "$f"
+}
+
 rewrite_sources_to_series() {
   local from="$1" to="$2"
-  echo "==> rewriting apt sources $from → $to"
+  echo "==> rewriting Ubuntu archive apt sources $from → $to"
   local f
+  shopt -s nullglob
   for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources; do
     [[ -f "$f" ]] || continue
+    ubuntu_archive_source_file "$f" || continue
     "${SUDO[@]}" sed -i \
       -e "s/${from}/${to}/g" \
       -e "s/${from}-security/${to}-security/g" \
@@ -77,6 +85,7 @@ rewrite_sources_to_series() {
       -e "s/${to}-updates-updates/${to}-updates/g" \
       "$f"
   done
+  shopt -u nullglob
 }
 
 enable_deb_src() {
@@ -178,10 +187,24 @@ add_swap() {
   "${SUDO[@]}" swapon "$swap_file" || echo "warning: swapon failed (continuing)" >&2
 }
 
+# shellcheck source=.github/scripts/strip-third-party-apt-sources.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/strip-third-party-apt-sources.sh"
+
+prepare_apt_cache_dir() {
+  [[ -n "$APT_CACHE_DIR" ]] || return 0
+  mkdir -p "$APT_CACHE_DIR/partial"
+  APT_CACHE_DIR="$(cd "$APT_CACHE_DIR" && pwd)"
+  # _apt must read the workspace cache when apt runs via sudo.
+  "${SUDO[@]}" chown -R _apt:root "$APT_CACHE_DIR"
+  "${SUDO[@]}" chmod -R u+rwX,g+rwX "$APT_CACHE_DIR"
+}
+
 main() {
   echo "==> upgrade-runner-to-series: $BASE_SERIES → $TARGET_SERIES"
   add_swap
   strip_conflicting_runner_tools
+  strip_third_party_apt_sources
+  prepare_apt_cache_dir
 
   echo "==> pass 1: update/upgrade/dist-upgrade on $BASE_SERIES"
   apt_get update -qq

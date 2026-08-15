@@ -74,7 +74,7 @@ jobs:
 
       - name: Free runner disk (remove unused SDKs)
         run: |
-          chmod +x .github/scripts/free-runner-disk.sh .github/scripts/work-cache.sh .github/scripts/upgrade-runner-to-series.sh
+          chmod +x .github/scripts/free-runner-disk.sh .github/scripts/work-cache.sh .github/scripts/upgrade-runner-to-series.sh .github/scripts/strip-third-party-apt-sources.sh
           .github/scripts/free-runner-disk.sh
 
       - name: Restore apt package cache

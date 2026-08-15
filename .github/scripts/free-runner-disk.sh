@@ -122,6 +122,12 @@ done
 remove_path /var/lib/snapd/snaps "snap packages"
 remove_path /var/cache/snapd "snap cache"
 
+if [[ -f "$(dirname "${BASH_SOURCE[0]}")/strip-third-party-apt-sources.sh" ]]; then
+  # shellcheck source=.github/scripts/strip-third-party-apt-sources.sh
+  source "$(dirname "${BASH_SOURCE[0]}")/strip-third-party-apt-sources.sh"
+  strip_third_party_apt_sources
+fi
+
 echo "==> purging apt packages we do not need (best-effort)"
 # Only purge packages that are typically present and unused for this build.
 # Failures are ignored so the script stays portable across image revisions.
@@ -131,6 +137,7 @@ PURGE_PKGS=(
   dotnet-runtime-8.0
   aspnetcore-runtime-8.0
   powershell
+  azure-cli
   google-chrome-stable
   microsoft-edge-stable
   firefox
