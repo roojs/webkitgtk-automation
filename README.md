@@ -19,7 +19,7 @@ Builds are **native** (no Docker). `SERIES` must match the machine’s Ubuntu re
 
 | Where | Series |
 |-------|--------|
-| GitHub Actions (`ubuntu-24.04`) | **noble** |
+| GitHub Actions (`ubuntu-26.04`) | **resolute** (26.04 LTS) |
 | Local | whatever you are running (`./build.sh` defaults to the host codename) |
 
 ## Install from a Release
@@ -48,7 +48,7 @@ Before spending hours on CI, prove the patch applies to this series’ `debian/r
 
 ```bash
 ./scripts/pretest-patch.sh          # host series
-./scripts/pretest-patch.sh noble    # or explicit series
+./scripts/pretest-patch.sh resolute # or explicit series
 ```
 
 CI runs the same script as a **pretest** job that gates the heavy build, and on push/PR via `.github/workflows/pretest.yml`.
@@ -92,11 +92,11 @@ CLEAN=1 CLEAN_CACHE=1 ./build.sh
 
 | Knob | Plain meaning |
 |------|----------------|
-| **GTK4-only** (`ENABLE_SOUP3=NO`) | Ubuntu normally compiles WebKit twice (4.1 + 6.0). We only need 6.0, so we skip the soup3 build (~half the work). |
+| **GTK4-only** (`ENABLE_GTK3=NO`) | Ubuntu normally compiles WebKit twice (4.1 + 6.0). We only need 6.0, so we skip the gtk3 build (~half the work). |
 | **`noautodbgsym`** | Do not emit separate `*-dbgsym` / `.ddeb` packages. |
 | **`-g0`** | Do not embed debug info in object files. |
 | **Gold linker** (`-fuse-ld=gold`) | Use `binutils-gold` (`ld.gold`) for lower peak RAM than `ld.bfd` when linking JSC. Strip BFD-only `-Wl,--reduce-memory-overheads` (gold/lld reject or mangle it). |
-| **MiniBrowser off** | Skip a demo browser binary we do not ship. |
+| **MiniBrowser off** | Not applicable on 26.04 (resolute dropped the MiniBrowser toggle). |
 
 ## Build on GitHub Actions
 
@@ -110,13 +110,13 @@ git push origin build-$(date +%Y%m%d)
 # sleep / check Releases later — no need to babysit Actions
 ```
 
-Examples: `build-20260814`, `build-noble-1`.
+Examples: `build-20260814`, `build-resolute-1`.
 
 ### Manual run
 
 **Actions → Build libwebkitgtk-6.0 with WebDriver → Run workflow** (same pipeline).
 
-Native on `ubuntu-24.04` (**noble**). No Docker. Flow:
+Native on `ubuntu-26.04` (**resolute**). No Docker. Flow:
 
 1. Checkout
 2. **Pretest** — `scripts/pretest-patch.sh` (patch must apply; fails fast)

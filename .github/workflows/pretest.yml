@@ -26,11 +26,11 @@ permissions:
   contents: read
 
 env:
-  SERIES: noble
+  SERIES: resolute
 
 jobs:
   pretest:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - name: Check out repository

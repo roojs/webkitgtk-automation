@@ -14,7 +14,7 @@
 # CI resource knobs (defaults are CI-friendly):
 #   - DEB_BUILD_OPTIONS includes noautodbgsym (no huge .ddeb packages)
 #   - Patch uses -g0; gold linker (-fuse-ld=gold) via binutils-gold; strips BFD-only --reduce-memory-overheads
-#   - GTK4-only build (soup3 skipped); system webkitgtk-webdriver is kept
+#   - GTK4-only build (gtk3 skipped); system webkitgtk-webdriver is kept
 set -euo pipefail
 
 host_series() {
@@ -26,7 +26,7 @@ host_series() {
 }
 
 HOST_SERIES="$(host_series)"
-DEFAULT_SERIES="${HOST_SERIES:-noble}"
+DEFAULT_SERIES="${HOST_SERIES:-resolute}"
 SERIES="${SERIES:-${1:-$DEFAULT_SERIES}}"
 SUFFIX="${SUFFIX:-${2:-+webkitgtk1}}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -57,7 +57,7 @@ usage() {
 Usage: ./build.sh [SERIES] [SUFFIX]
 
 Env:
-  SERIES              Ubuntu series (default: host VERSION_CODENAME, else noble)
+  SERIES              Ubuntu series (default: host VERSION_CODENAME, else resolute)
   SUFFIX              Version suffix (default: +webkitgtk1)
   WORK_DIR            Unpacked source + object dirs (default: ./work)
   CACHE_DIR           Persistent caches (default: ./cache)
@@ -321,7 +321,7 @@ RESUME=0
 RULES_REFRESHED=0
 
 drop_stale_packaging_state_after_rules_refresh() {
-  # Packaging-only rules change: gtk4-only control omits soup3 binaries, so -N soup3
+  # Packaging-only rules change: gtk4-only control omits gtk3 binaries, so -N gtk3
   # flags are invalid. Regenerated install lists must match patched override_dh_auto_configure.
   echo "==> dropping stale gtk4 debhelper files and cmake cache after rules refresh"
   rm -f \

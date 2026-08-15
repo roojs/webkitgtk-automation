@@ -1,6 +1,6 @@
 name: Monitor upstream webkit2gtk
 
-# Daily: if Ubuntu publishes a newer webkit2gtk source for noble, pretest and push
+# Daily: if Ubuntu publishes a newer webkit2gtk source for resolute, pretest and push
 # a build-upstream-* tag (same path as manual build-* tags).
 on:
   schedule:
@@ -26,11 +26,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SERIES: noble
+  SERIES: resolute
 
 jobs:
   monitor:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - name: Check out repository

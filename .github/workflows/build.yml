@@ -40,7 +40,7 @@ env:
   APT_CACHE_DIR: .ci-cache/apt
   WORK_CACHE_DIR: .ci-cache/work
   # Native build on the runner image — must match runs-on.
-  SERIES: noble
+  SERIES: resolute
   # workflow_dispatch inputs are empty on tag pushes — fall back to defaults.
   SUFFIX: ${{ github.event.inputs.suffix || '+webkitgtk1' }}
   CLEAN: ${{ github.event.inputs.clean == 'true' && '1' || '0' }}
@@ -52,7 +52,7 @@ env:
 jobs:
   # Cheap gate: patch must apply to this series' debian/rules before we spend hours.
   pretest:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - name: Check out repository
@@ -71,7 +71,7 @@ jobs:
     needs: pretest
     # Prefer a large/self-hosted runner if available. Hosted runners persist
     # apt + ccache + packed work/ (build-gtk4) when under the cache size budget.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 360
 
     steps:

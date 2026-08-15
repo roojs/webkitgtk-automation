@@ -2,8 +2,8 @@
 # Fast validation for build.sh helpers, packaging flow, and work-cache — no WebKit compile.
 #
 # Usage:
-#   ./scripts/test-build-scripts.sh           # host / SERIES=noble
-#   SERIES=noble ./scripts/test-build-scripts.sh
+#   ./scripts/test-build-scripts.sh           # host / SERIES=resolute
+#   SERIES=resolute ./scripts/test-build-scripts.sh
 #
 # Requires: bash, patch, tar, zstd, fakeroot, devscripts (for debian/rules control target).
 set -euo pipefail
@@ -24,7 +24,7 @@ host_series() {
 }
 
 SERIES="${SERIES:-$(host_series)}"
-SERIES="${SERIES:-noble}"
+SERIES="${SERIES:-resolute}"
 
 pass() { echo "  ok: $*"; }
 fail() { echo "FAIL: $*" >&2; exit 1; }
@@ -70,9 +70,9 @@ test_compile_cache_key_pipefail() {
   (
     set -euo pipefail
     key="$(read_compile_cache_key "$COMPILE_CACHE_KEY_FILE")"
-    [[ "$key" == "v1" ]] || exit 1
-  ) || fail "expected compile cache key v1 under pipefail"
-  pass "key=v1"
+    [[ "$key" == "v2" ]] || exit 1
+  ) || fail "expected compile cache key v2 under pipefail"
+  pass "key=v2"
 
   echo "==> compile-cache-key regression (broken tr|grep pipeline must fail)"
   if (
@@ -110,21 +110,21 @@ test_marker_matching() {
   }
 
   cat >"$marker" <<EOF
-SERIES=noble
+SERIES=resolute
 SUFFIX=+webkitgtk1
-COMPILE_CACHE_KEY=v1
+COMPILE_CACHE_KEY=v2
 PATCH_SHA256=abc
 EOF
-  marker_matches "$marker" noble '+webkitgtk1' v1 || fail "new marker should match"
-  marker_matches "$marker" noble '+webkitgtk1' v2 && fail "wrong compile key should not match"
+  marker_matches "$marker" resolute '+webkitgtk1' v2 || fail "new marker should match"
+  marker_matches "$marker" resolute '+webkitgtk1' v1 && fail "wrong compile key should not match"
   pass "new marker"
 
   cat >"$marker" <<EOF
-SERIES=noble
+SERIES=resolute
 SUFFIX=+webkitgtk1
 PATCH_SHA256=abc
 EOF
-  marker_matches "$marker" noble '+webkitgtk1' v1 || fail "legacy marker should match"
+  marker_matches "$marker" resolute '+webkitgtk1' v2 || fail "legacy marker should match"
   pass "legacy marker"
   trap - RETURN
 }
@@ -202,15 +202,15 @@ test_packaging_flow() {
   [[ -f "$src/debian/control" ]] || fail "debian/control not generated"
   grep -q '^Package: libwebkitgtk-6.0-4$' "$src/debian/control" || fail "gtk4 runtime package missing from control"
   if grep -q '^Package: libwebkit2gtk-4.1' "$src/debian/control"; then
-    fail "soup3 binary packages should be absent from regenerated control"
+    fail "gtk3 binary packages should be absent from regenerated control"
   fi
   pass "debian/control gtk4-only"
 
-  # gtk4-only control must not use -N for soup3 packages that are not listed.
+  # gtk4-only control must not use -N for gtk3 packages that are not listed.
   if grep -q -- '-Nlibwebkit2gtk-4.1-0' "$src/debian/rules"; then
-    fail "patched debian/rules must not -N soup3 packages when ENABLE_SOUP3=NO"
+    fail "patched debian/rules must not -N gtk3 packages when ENABLE_GTK3=NO"
   fi
-  pass "no invalid soup3 -N skip flags"
+  pass "no invalid gtk3 -N skip flags"
 
   # Simulate refresh_debian_rules_from_patch (build.sh resume path).
   echo "# stale" >>"$src/debian/rules"
@@ -290,9 +290,9 @@ test_work_cache_roundtrip() {
   mkdir -p "$src/build-gtk4" "$cache_root"
   echo "ninja marker" >"$src/build-gtk4/.ninja_log"
   cat >"$src/$MARKER_NAME" <<EOF
-SERIES=noble
+SERIES=resolute
 SUFFIX=+webkitgtk1
-COMPILE_CACHE_KEY=v1
+COMPILE_CACHE_KEY=v2
 PATCH_SHA256=dummy
 EOF
 

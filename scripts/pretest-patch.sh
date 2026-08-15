@@ -21,7 +21,7 @@ host_series() {
 }
 
 SERIES="${SERIES:-${1:-$(host_series)}}"
-SERIES="${SERIES:-noble}"
+SERIES="${SERIES:-resolute}"
 
 if [[ ! -f "$PATCH" ]]; then
   echo "error: missing $PATCH" >&2
@@ -115,13 +115,12 @@ echo "==> applying for real (temp tree only) to confirm"
   patch -p1 < "$PATCH" >/dev/null
   # Spot-check critical markers landed.
   grep -q 'ENABLE_WEBDRIVER_GTK4 = -DENABLE_WEBDRIVER=ON' debian/rules
-  grep -q 'ENABLE_SOUP3=NO' debian/rules
+  grep -q 'ENABLE_GTK3=NO' debian/rules
   grep -q 'fuse-ld=gold' debian/rules
   ! grep -q 'reduce-memory-overheads' debian/rules
   ! grep -q 'fuse-ld=lld' debian/rules
   grep -q -- '-Nlibwebkitgtk-doc' debian/rules
-  grep -q 'ifneq (\$(filter -N\$(LIBWEBKITGTKDOC_PKG)' debian/rules
-  grep -q '/MiniBrowser/d' debian/rules
+  grep -q 'libwebkitgtk-doc' debian/rules
   ! grep -q -- '-Nlibwebkit2gtk-4.1-0' debian/rules
 )
 

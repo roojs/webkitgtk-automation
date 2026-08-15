@@ -1,24 +1,11 @@
 #!/usr/bin/env bash
 # Print the newest webkit2gtk *source package* version published for SERIES
-# (noble + noble-updates + noble-security). Matches what apt-get source would fetch.
+# (SERIES + updates + security). Matches what apt-get source would fetch.
 #
 # Usage: ./scripts/upstream-webkit-version.sh [SERIES]
 set -euo pipefail
 
-SERIES="${1:-noble}"
-
-host_series() {
-  if [[ -r /etc/os-release ]]; then
-    # shellcheck disable=SC1091
-    . /etc/os-release
-    echo "${VERSION_CODENAME:-}"
-  fi
-}
-
-if [[ -n "$(host_series)" && "$SERIES" != "$(host_series)" ]]; then
-  echo "error: SERIES=$SERIES does not match host ($(host_series))" >&2
-  exit 1
-fi
+SERIES="${1:-resolute}"
 
 export DEBIAN_FRONTEND=noninteractive
 

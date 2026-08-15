@@ -5,13 +5,13 @@
 #   ./scripts/monitor-upstream-build.sh
 #
 # Env:
-#   SERIES          Ubuntu series (default: noble)
+#   SERIES          Ubuntu series (default: resolute)
 #   DRY_RUN=1       Log actions only; do not commit, tag, or push
 #   FORCE_BUILD=1   Build even when upstream matches tracked (pretest still required)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SERIES="${SERIES:-noble}"
+SERIES="${SERIES:-resolute}"
 TRACKED_FILE="$REPO_ROOT/.github/tracked-upstream-version"
 PENDING_FILE="$REPO_ROOT/.github/pending-upstream-version"
 SUFFIX="${SUFFIX:-+webkitgtk1}"
