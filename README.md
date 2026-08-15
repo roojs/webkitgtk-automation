@@ -120,13 +120,16 @@ Native on `ubuntu-26.04` (**resolute**). No Docker. Flow:
 
 1. Checkout
 2. **Pretest** — `scripts/pretest-patch.sh` (patch must apply; fails fast)
-3. **Free runner disk** — `.github/scripts/free-runner-disk.sh`
-4. Restore **apt**, **ccache**, and **work** caches
-5. Unpack work tree if present (resumes `build-gtk4` via `build.sh` `-nc`)
-6. `apt-get upgrade` into the apt archive cache
-7. `./build.sh`
+3. **Free runner disk** — strip unused SDKs and GHA preinstalled tools
+4. **Setup minimal build env** — swap, archive `cmake` only (no `apt-get upgrade`), orchestration packages
+5. Restore **apt**, **ccache**, and **work** caches
+6. Unpack work tree if present (resumes `build-gtk4` via `build.sh` `-nc`)
+7. `./build.sh` (pinned `webkit2gtk` source + `build-dep` only)
 8. On **failure/cancel**: pack `work/` → save work cache (next run continues)
 9. Save apt / ccache; on success upload `.deb`s and publish a Release
+
+Source versions are pinned in `.github/pinned-webkit-version` (not archive “latest”).
+The CI image’s preinstalled CMake 4.4.x is removed; Ubuntu archive cmake is installed and held.
 
 If the packed work tree is over ~10 GiB, pack is skipped (Actions cache budget). Raise the repo Actions cache limit, use a self-hosted runner with a persistent `work/`, or rely on ccache alone.
 
@@ -146,6 +149,8 @@ Manual `workflow_dispatch` inputs:
 | `scripts/pretest-patch.sh` | Dry-run patch against series `debian/rules` (no compile) |
 | `patches/enable-webdriver-gtk4.patch` | WebDriver GTK4 + CI resource / ccache / install fixes |
 | `build.sh` | Native fetch → patch → resumable `dpkg-buildpackage` → `dist/` |
+| `.github/pinned-webkit-version` | Pinned `webkit2gtk` source version per series |
+| `.github/scripts/setup-ci-build-env.sh` | Minimal CI base: swap, strip GHA tools, archive cmake, orchestration pkgs |
 | `.github/scripts/free-runner-disk.sh` | Thorough hosted-runner cleanup |
 | `.github/scripts/work-cache.sh` | Pack/unpack `work/` for incremental CI resume |
 | `.github/workflows/build.yml` | Cleanup, apt upgrade+cache, work/ccache, Release |

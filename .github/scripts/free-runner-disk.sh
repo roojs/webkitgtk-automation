@@ -109,6 +109,15 @@ remove_path /usr/local/share/edge_driver "EdgeDriver"
 remove_path /usr/local/share/gecko_driver "GeckoDriver"
 remove_path /usr/share/java/selenium-server.jar "Selenium jar"
 
+# GHA preinstalls CMake 4.4.x and ninja in /usr/local/bin — conflicts with archive
+# packages used for webkit2gtk 2.52.3 (see setup-ci-build-env.sh).
+for tool in cmake cpack ctest ninja ccmake; do
+  if [[ -f "/usr/local/bin/$tool" ]]; then
+    echo "    removing preinstalled tool: /usr/local/bin/$tool"
+    "${SUDO[@]}" rm -f "/usr/local/bin/$tool"
+  fi
+done
+
 # Snap cache if present
 remove_path /var/lib/snapd/snaps "snap packages"
 remove_path /var/cache/snapd "snap cache"

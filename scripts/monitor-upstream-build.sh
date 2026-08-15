@@ -11,6 +11,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/lib/pinned-webkit-version.sh
+source "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh"
 SERIES="${SERIES:-resolute}"
 TRACKED_FILE="$REPO_ROOT/.github/tracked-upstream-version"
 PENDING_FILE="$REPO_ROOT/.github/pending-upstream-version"
@@ -37,13 +39,20 @@ sanitize_tag_suffix() {
 }
 
 current="$("$REPO_ROOT/scripts/upstream-webkit-version.sh" "$SERIES")"
+pinned="$(read_pinned_webkit_version "$SERIES")"
 tracked="$(read_state_file "$TRACKED_FILE")"
 pending="$(read_state_file "$PENDING_FILE")"
 
 echo "==> monitor series=$SERIES"
 echo "==> archive webkit2gtk source version: $current"
+echo "==> pinned (build target): $pinned"
 echo "==> tracked (last successful build): ${tracked:-<none>}"
 echo "==> pending (in-flight auto-build): ${pending:-<none>}"
+
+if [[ "$current" != "$pinned" ]]; then
+  echo "==> archive ($current) != pinned ($pinned); bump .github/pinned-webkit-version after validation — no auto-build"
+  exit 0
+fi
 
 if [[ -n "${FORCE_BUILD:-}" && "${FORCE_BUILD}" != "0" ]]; then
   echo "==> FORCE_BUILD=1: will run pretest and queue a build"

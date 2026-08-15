@@ -80,18 +80,20 @@ jobs:
 
       - name: Free runner disk (remove unused SDKs)
         run: |
-          chmod +x .github/scripts/free-runner-disk.sh .github/scripts/work-cache.sh .github/scripts/prepare-ci-runner.sh
+          chmod +x .github/scripts/free-runner-disk.sh .github/scripts/work-cache.sh .github/scripts/setup-ci-build-env.sh
           .github/scripts/free-runner-disk.sh
 
-      - name: Prepare runner (swap + resource headroom)
-        run: .github/scripts/prepare-ci-runner.sh
+      - name: Setup minimal build environment
+        env:
+          APT_CACHE_DIR: ${{ env.APT_CACHE_DIR }}
+        run: .github/scripts/setup-ci-build-env.sh
 
       - name: Restore apt package cache
         id: restore-apt
         uses: actions/cache/restore@v5
         with:
           path: ${{ env.APT_CACHE_DIR }}
-          key: apt-webkitgtk-v1-${{ env.REFRESH_APT == '1' && github.run_id || 'stable' }}-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/prepare-ci-runner.sh', 'build.sh') }}
+          key: apt-webkitgtk-v1-${{ env.REFRESH_APT == '1' && github.run_id || 'stable' }}-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/setup-ci-build-env.sh', 'build.sh') }}
           restore-keys: |
             apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-
             apt-webkitgtk-v1-stable-${{ env.SERIES }}-
@@ -137,19 +139,6 @@ jobs:
           df -h
           if [[ -d work ]]; then du -sh work work/* 2>/dev/null || true; fi
 
-      - name: Upgrade system packages (into apt archive cache)
-        id: apt-upgrade
-        run: |
-          set -euo pipefail
-          mkdir -p "$APT_CACHE_DIR"
-          APT_ARCHIVES="$PWD/$APT_CACHE_DIR"
-          export DEBIAN_FRONTEND=noninteractive
-          sudo apt-get update
-          sudo apt-get upgrade -y -o "Dir::Cache::archives=$APT_ARCHIVES"
-          sudo rm -rf "$APT_ARCHIVES/partial" "$APT_ARCHIVES/lock"
-          sudo chown -R "$(id -u):$(id -g)" "$APT_CACHE_DIR"
-          sudo apt-get install -y -o "Dir::Cache::archives=$APT_ARCHIVES" zstd
-
       - name: Build packages
         id: build
         env:
@@ -182,11 +171,11 @@ jobs:
           key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
 
       - name: Save apt package cache
-        if: always() && steps.apt-upgrade.outcome == 'success' && steps.restore-apt.outputs.cache-hit != 'true'
+        if: always() && steps.restore-apt.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: ${{ env.APT_CACHE_DIR }}
-          key: apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/prepare-ci-runner.sh', 'build.sh') }}
+          key: apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/setup-ci-build-env.sh', 'build.sh') }}
 
       - name: Save ccache
         if: ${{ always() && (steps.build.outcome == 'success' || steps.build.outcome == 'failure' || steps.build.outcome == 'cancelled') }}

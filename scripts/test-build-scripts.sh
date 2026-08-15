@@ -14,6 +14,8 @@ COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
 MARKER_NAME=".webkitgtk-automation-prepared"
 # shellcheck source=scripts/lib/debian-tarball.sh
 source "$REPO_ROOT/scripts/lib/debian-tarball.sh"
+# shellcheck source=scripts/lib/pinned-webkit-version.sh
+source "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh"
 
 host_series() {
   if [[ -r /etc/os-release ]]; then
@@ -54,10 +56,11 @@ test_shell_syntax() {
     "$REPO_ROOT/scripts/upstream-webkit-version.sh" \
     "$REPO_ROOT/scripts/monitor-upstream-build.sh" \
     "$REPO_ROOT/scripts/lib/debian-tarball.sh" \
+    "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh" \
     "$REPO_ROOT/scripts/test-build-scripts.sh" \
     "$REPO_ROOT/.github/scripts/work-cache.sh" \
     "$REPO_ROOT/.github/scripts/free-runner-disk.sh" \
-    "$REPO_ROOT/.github/scripts/prepare-ci-runner.sh"
+    "$REPO_ROOT/.github/scripts/setup-ci-build-env.sh"
   do
     bash -n "$f" || fail "bash -n $f"
     pass "$(basename "$f")"
@@ -70,9 +73,9 @@ test_compile_cache_key_pipefail() {
   (
     set -euo pipefail
     key="$(read_compile_cache_key "$COMPILE_CACHE_KEY_FILE")"
-    [[ "$key" == "v2" ]] || exit 1
-  ) || fail "expected compile cache key v2 under pipefail"
-  pass "key=v2"
+    [[ "$key" == "v3" ]] || exit 1
+  ) || fail "expected compile cache key v3 under pipefail"
+  pass "key=v3"
 
   echo "==> compile-cache-key regression (broken tr|grep pipeline must fail)"
   if (
@@ -112,11 +115,11 @@ test_marker_matching() {
   cat >"$marker" <<EOF
 SERIES=resolute
 SUFFIX=+webkitgtk1
-COMPILE_CACHE_KEY=v2
+COMPILE_CACHE_KEY=v3
 PATCH_SHA256=abc
 EOF
-  marker_matches "$marker" resolute '+webkitgtk1' v2 || fail "new marker should match"
-  marker_matches "$marker" resolute '+webkitgtk1' v1 && fail "wrong compile key should not match"
+  marker_matches "$marker" resolute '+webkitgtk1' v3 || fail "new marker should match"
+  marker_matches "$marker" resolute '+webkitgtk1' v2 && fail "wrong compile key should not match"
   pass "new marker"
 
   cat >"$marker" <<EOF
@@ -124,14 +127,15 @@ SERIES=resolute
 SUFFIX=+webkitgtk1
 PATCH_SHA256=abc
 EOF
-  marker_matches "$marker" resolute '+webkitgtk1' v2 || fail "legacy marker should match"
+  marker_matches "$marker" resolute '+webkitgtk1' v3 || fail "legacy marker should match"
   pass "legacy marker"
   trap - RETURN
 }
 
 fetch_debian_tree() {
-  local dest="$1"
+  local dest="$1" pinned
   local sources lists cache deb_tar
+  pinned="$(read_pinned_webkit_version "$SERIES")"
   sources="$dest/apt-sources.list"
   lists="$dest/apt-lists"
   cache="$dest/apt-cache"
@@ -157,7 +161,7 @@ SOURCES
         -o "Dir::Etc::sourceparts=/dev/null" \
         -o "Dir::State::Lists=$lists" \
         -o "Dir::Cache=$cache" \
-        webkit2gtk
+        "webkit2gtk=$pinned"
     )
   } >&2
 
@@ -253,6 +257,7 @@ deb-src http://archive.ubuntu.com/ubuntu ${SERIES}-updates main universe
 deb-src http://archive.ubuntu.com/ubuntu ${SERIES}-security main universe
 SOURCES
 
+  pinned="$(read_pinned_webkit_version "$SERIES")"
   DOWNLOAD_WEBKIT2GTK_SOURCE_CMD="apt-get update -qq \
     -o Dir::Etc::sourcelist=$apt_sources \
     -o Dir::Etc::sourceparts=/dev/null \
@@ -263,7 +268,7 @@ SOURCES
     -o Dir::Etc::sourceparts=/dev/null \
     -o Dir::State::Lists=$apt_lists \
     -o Dir::Cache=$apt_cache \
-    webkit2gtk"
+    webkit2gtk=$pinned"
 
   echo "# stale" >>"$src/debian/rules"
   refresh_debian_rules_from_patch "$src" "$PATCH" || fail "refresh without cached tarball failed"
@@ -292,7 +297,7 @@ test_work_cache_roundtrip() {
   cat >"$src/$MARKER_NAME" <<EOF
 SERIES=resolute
 SUFFIX=+webkitgtk1
-COMPILE_CACHE_KEY=v2
+COMPILE_CACHE_KEY=v3
 PATCH_SHA256=dummy
 EOF
 
@@ -309,6 +314,14 @@ EOF
   [[ -f "$src/build-gtk4/.ninja_log" ]] || fail "build-gtk4 missing after unpack"
   pass "roundtrip preserved marker and build-gtk4/"
   trap - RETURN
+}
+
+test_pinned_webkit_version() {
+  echo "==> pinned webkit2gtk version"
+  local pinned
+  pinned="$(read_pinned_webkit_version "$SERIES")"
+  [[ "$pinned" =~ ^2\. ]] || fail "unexpected pinned version: $pinned"
+  pass "$SERIES=$pinned"
 }
 
 test_upstream_version_probe() {
@@ -328,6 +341,7 @@ main() {
   test_shell_syntax
   test_compile_cache_key_pipefail
   test_marker_matching
+  test_pinned_webkit_version
   test_upstream_version_probe
   test_packaging_flow
   test_rules_refresh_without_cached_tarball

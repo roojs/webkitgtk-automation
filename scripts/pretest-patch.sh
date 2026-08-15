@@ -20,8 +20,12 @@ host_series() {
   fi
 }
 
+# shellcheck source=scripts/lib/pinned-webkit-version.sh
+source "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh"
+
 SERIES="${SERIES:-${1:-$(host_series)}}"
 SERIES="${SERIES:-resolute}"
+PINNED_WEBKIT_VERSION="$(read_pinned_webkit_version "$SERIES")"
 
 if [[ ! -f "$PATCH" ]]; then
   echo "error: missing $PATCH" >&2
@@ -30,7 +34,7 @@ fi
 
 export DEBIAN_FRONTEND=noninteractive
 
-echo "==> pretest series=$SERIES"
+echo "==> pretest series=$SERIES (pinned webkit2gtk $PINNED_WEBKIT_VERSION)"
 echo "==> patch=$PATCH"
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-pretest.XXXXXX")"
@@ -62,10 +66,10 @@ SOURCES
   echo "==> apt-get update (SERIES=$SERIES archive deb-src only)"
   apt-get update -qq "${apt_opts[@]}"
 
-  echo "==> apt-get source -d -y webkit2gtk (download-only)"
+  echo "==> apt-get source -d -y webkit2gtk=$PINNED_WEBKIT_VERSION (download-only)"
   (
     cd "$TMP"
-    apt-get source -d -y "${apt_opts[@]}" webkit2gtk
+    apt-get source -d -y "${apt_opts[@]}" "webkit2gtk=$PINNED_WEBKIT_VERSION"
     local deb_tar
     deb_tar="$(find . -maxdepth 1 -type f \( -name '*debian.tar.*' -o -name '*.debian.tar.*' \) | head -n 1)"
     if [[ -z "$deb_tar" ]]; then

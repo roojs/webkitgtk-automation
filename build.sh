@@ -34,6 +34,8 @@ PATCH="$REPO_ROOT/patches/enable-webdriver-gtk4.patch"
 COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
 # shellcheck source=scripts/lib/debian-tarball.sh
 source "$REPO_ROOT/scripts/lib/debian-tarball.sh"
+# shellcheck source=scripts/lib/pinned-webkit-version.sh
+source "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh"
 WORK_DIR="${WORK_DIR:-$REPO_ROOT/work}"
 DIST_DIR="$REPO_ROOT/dist"
 CACHE_DIR="${CACHE_DIR:-$REPO_ROOT/cache}"
@@ -231,6 +233,11 @@ fi
 apt_get update
 preseed_pbuilder_mirror
 
+# CI: setup-ci-build-env.sh pins archive cmake; keep /usr/bin ahead of /usr/local.
+if [[ -n "${GITHUB_ACTIONS:-}${CI_BUILD_LIMITS:-}" ]]; then
+  export PATH="/usr/bin:/bin:${PATH}"
+fi
+
 if [[ "$APT_UPGRADE" == "1" ]]; then
   echo "==> apt-get upgrade (archives → ${APT_CACHE_DIR:-system})"
   apt_get upgrade -y
@@ -357,11 +364,13 @@ else
   fi
 
   cd "$WORK_DIR"
-  echo "==> pulling webkit2gtk source for $SERIES"
+  PINNED_WEBKIT_VERSION="$(read_pinned_webkit_version "$SERIES")"
+  echo "==> pulling webkit2gtk source for $SERIES (pinned $PINNED_WEBKIT_VERSION)"
   if command -v pull-lp-source >/dev/null 2>&1; then
-    pull-lp-source webkit2gtk "$SERIES"
+    # pull-lp-source has no version pin; use apt for reproducible builds.
+    apt_get source "webkit2gtk=$PINNED_WEBKIT_VERSION"
   else
-    apt_get source webkit2gtk
+    apt_get source "webkit2gtk=$PINNED_WEBKIT_VERSION"
   fi
 
   SRC_DIR="$(find_src_dir)"

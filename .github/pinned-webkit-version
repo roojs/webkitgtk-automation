@@ -1,0 +1,5 @@
+# Pin webkit2gtk *source package* versions per Ubuntu series.
+# build.sh fetches exactly these versions — not archive "latest".
+# Bump a series only after a green CI build on that series.
+resolute=2.52.3-0ubuntu0.26.04.3
+noble=2.52.3-0ubuntu0.24.04.1
