@@ -97,6 +97,14 @@ jobs:
             apt-webkitgtk-v1-stable-${{ env.SERIES }}-
             apt-webkitgtk-v1-
 
+      - name: Fix apt cache ownership for _apt
+        run: |
+          if [[ -d "${{ env.APT_CACHE_DIR }}" ]]; then
+            sudo mkdir -p "${{ env.APT_CACHE_DIR }}/partial"
+            sudo chown -R _apt:root "${{ env.APT_CACHE_DIR }}"
+            sudo chmod -R u+rwX,g+rwX "${{ env.APT_CACHE_DIR }}"
+          fi
+
       - name: Restore ccache
         uses: actions/cache/restore@v5
         id: restore-ccache

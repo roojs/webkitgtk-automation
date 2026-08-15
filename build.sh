@@ -134,13 +134,31 @@ export DEB_BUILD_OPTIONS
 
 APT_ARCHIVE_OPTS=()
 if [[ -n "$APT_CACHE_DIR" ]]; then
-  mkdir -p "$APT_CACHE_DIR"
-  # Resolve to absolute path — apt runs as root and relative paths are fragile.
+  mkdir -p "$APT_CACHE_DIR/partial"
   APT_CACHE_DIR="$(cd "$APT_CACHE_DIR" && pwd)"
   APT_ARCHIVE_OPTS=(-o "Dir::Cache::archives=$APT_CACHE_DIR")
 fi
 
+prepare_apt_cache() {
+  [[ -n "$APT_CACHE_DIR" ]] || return 0
+  mkdir -p "$APT_CACHE_DIR/partial"
+  APT_CACHE_DIR="$(cd "$APT_CACHE_DIR" && pwd)"
+  APT_ARCHIVE_OPTS=(-o "Dir::Cache::archives=$APT_CACHE_DIR")
+  if [[ "$(id -u)" -ne 0 ]]; then
+    "${SUDO[@]}" chown -R _apt:root "$APT_CACHE_DIR"
+    "${SUDO[@]}" chmod -R u+rwX,g+rwX "$APT_CACHE_DIR"
+  fi
+}
+
+chown_tree_to_builder() {
+  local dir="$1"
+  if [[ "$(id -u)" -ne 0 ]]; then
+    "${SUDO[@]}" chown -R "$(id -u):$(id -g)" "$dir"
+  fi
+}
+
 apt_get() {
+  prepare_apt_cache
   "${SUDO[@]}" apt-get "${APT_ARCHIVE_OPTS[@]}" "$@"
 }
 
@@ -372,6 +390,8 @@ else
   else
     apt_get source "webkit2gtk=$PINNED_WEBKIT_VERSION"
   fi
+
+  chown_tree_to_builder "$WORK_DIR"
 
   SRC_DIR="$(find_src_dir)"
   if [[ -z "$SRC_DIR" || ! -d "$SRC_DIR" ]]; then
