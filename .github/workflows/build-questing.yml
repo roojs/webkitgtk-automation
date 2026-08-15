@@ -40,6 +40,9 @@ env:
   APT_CACHE_DIR: .ci-cache/apt-questing
   WORK_CACHE_DIR: .ci-cache/work
   SERIES: questing
+  DEBIAN_FRONTEND: noninteractive
+  NEEDRESTART_MODE: a
+  NEEDRESTART_SUSPEND: "1"
   SUFFIX: ${{ github.event.inputs.suffix || '+webkitgtk1' }}
   CLEAN: ${{ github.event.inputs.clean == 'true' && '1' || '0' }}
   CLEAN_CACHE: ${{ github.event.inputs.clean_cache == 'true' && '1' || '0' }}

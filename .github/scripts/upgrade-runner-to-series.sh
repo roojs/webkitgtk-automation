@@ -18,6 +18,7 @@ fi
 
 export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_MODE=a
+export NEEDRESTART_SUSPEND=1
 
 TARGET_SERIES="${TARGET_SERIES:?TARGET_SERIES is required}"
 # Workspace apt cache is for build.sh only — dist-upgrade must use /var/cache/apt/archives.
@@ -127,11 +128,28 @@ EOF
 }
 
 apt_dist_upgrade() {
+  local rc=0
+  set +e
   apt_get \
     -o Acquire::AllowReleaseInfoChange=true \
     -o Dpkg::Options::=--force-confdef \
     -o Dpkg::Options::=--force-confold \
     dist-upgrade -y
+  rc=$?
+  set -e
+
+  "${SUDO[@]}" dpkg --configure -a
+
+  if [[ "$rc" -ne 0 ]]; then
+    if "${SUDO[@]}" dpkg --audit 2>/dev/null | grep -q .; then
+      echo "error: dpkg audit reported broken packages after dist-upgrade (apt exit $rc)" >&2
+      "${SUDO[@]}" dpkg --audit >&2 || true
+      return "$rc"
+    fi
+    echo "warning: apt-get dist-upgrade exited $rc but dpkg audit is clean; continuing"
+    rc=0
+  fi
+  return "$rc"
 }
 
 enable_deb_src() {
@@ -234,6 +252,14 @@ main() {
   echo "==> pass 2: dist-upgrade to $TARGET_SERIES (archive.ubuntu.com)"
   apt_get update -qq
   apt_dist_upgrade
+
+  local upgraded_series
+  upgraded_series="$(host_series)"
+  echo "==> host series after pass 2: ${upgraded_series:-unknown}"
+  if [[ "$upgraded_series" != "$TARGET_SERIES" ]]; then
+    echo "error: expected VERSION_CODENAME=$TARGET_SERIES after dist-upgrade, got ${upgraded_series:-<empty>}" >&2
+    exit 1
+  fi
 
   install_orchestration_packages
   enable_deb_src
