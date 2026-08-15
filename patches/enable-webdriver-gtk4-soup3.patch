@@ -21,8 +21,8 @@
  USE_OLD_PKG_NAMES=NO
  
  EXTRA_DH_ARGUMENTS =
-+# webkitgtk-automation: ship libwebkitgtk-6.0 only; keep system webkitgtk-webdriver.
-+EXTRA_DH_ARGUMENTS += -Nlibwebkitgtk-doc
++# webkitgtk-automation: ship libwebkitgtk-6.0 only; keep system jsc/webdriver (4.1).
++EXTRA_DH_ARGUMENTS += -Nlibwebkitgtk-doc -Nlibjavascriptcoregtk-bin -Nwebkitgtk-webdriver
  EXTRA_CMAKE_ARGUMENTS = -DPORT=GTK \
  	   -DCMAKE_INSTALL_LIBEXECDIR=lib/$(DEB_HOST_MULTIARCH) \
  	   -DCMAKE_C_FLAGS_RELEASE="" \

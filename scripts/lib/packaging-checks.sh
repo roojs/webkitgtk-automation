@@ -32,6 +32,10 @@ assert_patched_rules_markers() {
         || { echo "error: soup3-gtk4 layout expects ENABLE_SOUP3=NO" >&2; return 1; }
       grep -q 'ENABLE_GTK4=YES' "$rules" \
         || { echo "error: soup3-gtk4 layout expects ENABLE_GTK4=YES" >&2; return 1; }
+      grep -q -- '-Nlibjavascriptcoregtk-bin' "$rules" \
+        || { echo "error: soup3-gtk4 layout must skip libjavascriptcoregtk-bin (4.1 jsc)" >&2; return 1; }
+      grep -q -- '-Nwebkitgtk-webdriver' "$rules" \
+        || { echo "error: soup3-gtk4 layout must skip webkitgtk-webdriver" >&2; return 1; }
       if grep -q '^ENABLE_GTK3=' "$rules"; then
         echo "error: soup3-gtk4 layout must not use ENABLE_GTK3 toggles" >&2
         return 1
