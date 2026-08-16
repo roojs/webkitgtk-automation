@@ -1,5 +1,5 @@
---- a/debian/rules
-+++ b/debian/rules
+--- a/debian/rules	2026-08-16 23:08:52.045857657 +0000
++++ b/debian/rules	2026-08-16 23:10:02.838081169 +0000
 @@ -5,14 +5,26 @@
  include /usr/share/dpkg/architecture.mk
  include /usr/share/dpkg/buildflags.mk
@@ -56,7 +56,22 @@
  # The debhelper files for the gtk3 and gtk4 builds are almost
  # identical so we generate the latter from the former.
  WEBKIT_DH_FILES = \
-@@ -237,9 +255,12 @@
+@@ -217,6 +235,14 @@
+ 			    -e 's/webkit2/webkit/g' \
+ 			    -e 's/4\.1/6.0/g'
+ 
++# webkitgtk-automation: rename gtk4 packages/paths for parallel install.
++WEBKIT_DH_RENAME_WEBDRIVER_NAMES = sed -e 's/libwebkitgtk-6.0-4/libwebkitgtk-6.0-webdriver4/g' \
++			    -e 's/libwebkitgtk-6.0-dev/libwebkitgtk-6.0-webdriver-dev/g'
++WEBKIT_DH_RENAME_WEBDRIVER = sed -e 's/libwebkitgtk-6.0-4/libwebkitgtk-6.0-webdriver4/g' \
++			    -e 's/libwebkitgtk-6.0-dev/libwebkitgtk-6.0-webdriver-dev/g' \
++			    -e 's/libwebkitgtk-6.0\.so/libwebkitgtk-6.0-webdriver.so/g' \
++			    -e 's/webkitgtk-6\.0\//webkitgtk-6.0-webdriver/g'
++
+ %:
+ 	dh $@ --with gir --buildsystem=cmake+ninja $(EXTRA_DH_ARGUMENTS)
+ 
+@@ -237,9 +263,12 @@
  		sed -e 's/@WK_API_VERSION@/6.0/g' \
  		    -e 's/@LIBJSC_PKG@/libjavascriptcoregtk-6.0-1/g' \
  		    -e 's/@WEBKIT@/webkit/g' \
@@ -70,28 +85,35 @@
  	sed -i '$${/^$$/d}' debian/control # Remove last empty line
  
  override_dh_gencontrol:
-@@ -247,6 +268,20 @@
+@@ -247,33 +276,55 @@
  
  override_dh_auto_configure:
  	echo debian/clean > debian/clean
-+	cat > debian/webkitgtk-6.0-webdriver.pc <<'EOF'
-+prefix=/usr
-+libdir=$${prefix}/lib/$(DEB_HOST_MULTIARCH)
-+includedir=$${prefix}/include
-+
-+Name: webkitgtk-6.0-webdriver
-+Description: WebKitGTK 6.0 with WebDriver interactions (parallel install)
-+Version: $(shell dpkg-parsechangelog -S Version)
-+Requires: gtk4, libsoup-3.0, javascriptcoregtk-6.0
-+Libs: -L$${libdir} -lwebkitgtk-6.0-webdriver
-+Cflags: -I$${includedir}/webkitgtk-6.0
-+EOF
++	@{ \
++		echo 'prefix=/usr'; \
++		echo 'libdir=$${prefix}/lib/$(DEB_HOST_MULTIARCH)'; \
++		echo 'includedir=$${prefix}/include'; \
++		echo ''; \
++		echo 'Name: webkitgtk-6.0-webdriver'; \
++		echo 'Description: WebKitGTK 6.0 with WebDriver interactions (parallel install)'; \
++		echo 'Version: $(shell dpkg-parsechangelog -S Version)'; \
++		echo 'Requires: gtk4, libsoup-3.0, javascriptcoregtk-6.0'; \
++		echo 'Libs: -L$${libdir} -lwebkitgtk-6.0-webdriver'; \
++		echo 'Cflags: -I$${includedir}/webkitgtk-6.0'; \
++	} > debian/webkitgtk-6.0-webdriver.pc
 +	echo 'debian/webkitgtk-6.0-webdriver.pc usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/' > debian/libwebkitgtk-6.0-webdriver-dev.install
 +	echo debian/webkitgtk-6.0-webdriver.pc >> debian/clean
  	if [ "$(ENABLE_GTK4)" = "YES" ]; then \
  		for src in $(WEBKIT_DH_FILES); do \
  			dst=`echo $$src | $(WEBKIT_DH_RENAME_GTK4)` ; \
-@@ -258,22 +293,29 @@
+-			$(WEBKIT_DH_CONVERT_GTK4) debian/$$src > debian/$$dst ; \
+-			echo debian/$$dst >> debian/clean ; \
++			wd=`echo $$dst | $(WEBKIT_DH_RENAME_WEBDRIVER_NAMES)` ; \
++			$(WEBKIT_DH_CONVERT_GTK4) debian/$$src | $(WEBKIT_DH_RENAME_WEBDRIVER) > debian/$$wd ; \
++			echo debian/$$wd >> debian/clean ; \
+ 		done ; \
+ 	fi
+ 	$(GTK3_BUILD) dh_auto_configure -Bbuild-gtk3 -- \
  		-DENABLE_DOCUMENTATION=OFF -DUSE_GTK4=OFF \
  		$(EXTRA_CMAKE_ARGUMENTS)
  	$(GTK4_BUILD) dh_auto_configure -Bbuild-gtk4 -- \
@@ -123,7 +145,7 @@
  
  # Create a dummy doc directory in case the "nodoc" build option is set.
  override_dh_install-indep:
-@@ -287,8 +329,7 @@
+@@ -287,8 +338,7 @@
  override_dh_makeshlibs:
  	$(GTK3_BUILD) dh_makeshlibs -plibwebkit2gtk-4.1-0 -Xinjected-bundle
  	$(GTK3_BUILD) dh_makeshlibs -plibjavascriptcoregtk-4.1-0 -VNone
