@@ -19,9 +19,12 @@ Builds are **native** (no Docker). `SERIES` must match the machine’s Ubuntu re
 
 | Where | Series |
 |-------|--------|
+| GitHub Actions — **plucky** (`build-plucky-*` tags) | **plucky** (25.04) — noble runner upgraded in CI |
 | GitHub Actions — **questing** (`build-questing-*` tags) | **questing** (25.10) — noble runner upgraded in CI |
 | GitHub Actions — **resolute** (`build-resolute-*` tags) | **resolute** (26.04) — native on `ubuntu-26.04` |
 | Local | whatever you are running if listed in `.github/series-registry` |
+
+Install the `.deb` built for **your** Ubuntu series. A 25.10 package will not install on 25.04 (`libc6 >= 2.42`, exact `libjavascriptcoregtk-6.0-1` pin, `libxml2-16`).
 
 ## Install from a Release
 
@@ -122,6 +125,17 @@ Workflow: **Build libwebkitgtk-6.0 (25.10 questing)** (`.github/workflows/build-
 
 Runs on `ubuntu-24.04` (noble), dist-upgrades the runner to **questing**, then builds natively. Apt cache under `.ci-cache/apt-questing`.
 
+### Plucky (25.04)
+
+```bash
+git tag build-plucky-$(date +%Y%m%d)
+git push origin build-plucky-$(date +%Y%m%d)
+```
+
+Workflow: **Build libwebkitgtk-6.0 (25.04 plucky)** (`.github/workflows/build-plucky.yml`).
+
+Same noble→target upgrade as questing. Apt cache under `.ci-cache/apt-plucky`. Pinned source is `2.50.4` (what 25.04 ships), not the 2.52.3 used on 25.10/26.04.
+
 ### Resolute (26.04)
 
 Push a `build-resolute-*` tag (not bare `build-*` — that pattern is questing-only):
@@ -146,7 +160,7 @@ Native build flow (series-specific runner setup differs):
 1. Checkout
 2. **Pretest** — `scripts/test-build-scripts.sh` / `pretest-patch.sh` (patch must apply; fails fast)
 3. **Free runner disk** — strip unused SDKs and GHA preinstalled tools
-4. **Setup** — questing: noble→questing dist-upgrade + orchestration packages; resolute: minimal env + archive cmake
+4. **Setup** — plucky/questing: noble→target dist-upgrade + orchestration packages; resolute: minimal env + archive cmake
 5. Restore **apt**, **ccache**, and **work** caches
 6. Unpack work tree if present (resumes `build-gtk4` via `build.sh` `-nc`)
 7. `./build.sh` (pinned `webkit2gtk` source + `build-dep` only)
@@ -173,10 +187,11 @@ Manual `workflow_dispatch` inputs:
 |------|------|
 | `scripts/pretest-patch.sh` | Dry-run patch against series `debian/rules` (no compile) |
 | `patches/enable-webdriver-gtk4.patch` | WebDriver GTK4 patch (resolute / gtk3-gtk4 layout) |
-| `patches/enable-webdriver-gtk4-soup3.patch` | WebDriver GTK4 patch (noble/questing / soup3-gtk4 layout) |
+| `patches/enable-webdriver-gtk4-soup3.patch` | WebDriver GTK4 patch (noble/plucky/questing / soup3-gtk4 layout) |
 | `.github/series-registry` | Maps Ubuntu series → layout + patch file |
 | `scripts/lib/series-registry.sh` | Parse registry; resolve patch and build tags |
-| `.github/scripts/upgrade-runner-to-series.sh` | CI: dist-upgrade runner to target series (questing) |
+| `.github/scripts/upgrade-runner-to-series.sh` | CI: dist-upgrade runner to target series (plucky/questing) |
+| `.github/workflows/build-plucky.yml` | Plucky build (noble runner → 25.04 upgrade → Release) |
 | `.github/workflows/build-questing.yml` | Questing build (noble runner → 25.10 upgrade → Release) |
 | `.github/workflows/build.yml` | Resolute build (26.04 native → Release) |
 | `cache/ccache` | Persistent compiler cache (gitignored) |

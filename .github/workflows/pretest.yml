@@ -11,6 +11,7 @@ on:
       - ".github/workflows/pretest.yml"
       - ".github/workflows/build.yml"
       - ".github/workflows/build-questing.yml"
+      - ".github/workflows/build-plucky.yml"
       - ".github/workflows/monitor-upstream.yml"
   pull_request:
     paths:
@@ -21,6 +22,7 @@ on:
       - ".github/workflows/pretest.yml"
       - ".github/workflows/build.yml"
       - ".github/workflows/build-questing.yml"
+      - ".github/workflows/build-plucky.yml"
       - ".github/workflows/monitor-upstream.yml"
   workflow_dispatch:
 
@@ -34,7 +36,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        series: [questing, resolute]
+        series: [plucky, questing, resolute]
     steps:
       - name: Check out repository
         uses: actions/checkout@v5

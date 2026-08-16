@@ -3,4 +3,5 @@
 # Bump a series only after a green CI build on that series.
 resolute=2.52.3-0ubuntu0.26.04.3
 questing=2.52.3-0ubuntu0.25.10.1
+plucky=2.50.4-0ubuntu0.25.04.1
 noble=2.52.3-0ubuntu0.24.04.1
