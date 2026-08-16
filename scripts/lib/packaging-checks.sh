@@ -17,6 +17,10 @@ assert_patched_rules_markers() {
 
   grep -q 'ENABLE_WEBDRIVER_GTK4 = -DENABLE_WEBDRIVER=ON' "$rules" \
     || { echo "error: ENABLE_WEBDRIVER_GTK4 marker missing" >&2; return 1; }
+  grep -q 'WEBKITGTK_VARIANT_SUFFIX = -webdriver' "$rules" \
+    || { echo "error: WEBKITGTK_VARIANT_SUFFIX marker missing" >&2; return 1; }
+  grep -q 'WEBKIT_DH_RENAME_WEBDRIVER' "$rules" \
+    || { echo "error: WEBKIT_DH_RENAME_WEBDRIVER marker missing" >&2; return 1; }
   grep -q 'fuse-ld=gold' "$rules" \
     || { echo "error: gold linker marker missing" >&2; return 1; }
   ! grep -q 'reduce-memory-overheads' "$rules" \
@@ -25,6 +29,8 @@ assert_patched_rules_markers() {
     || { echo "error: lld linker must not be used" >&2; return 1; }
   grep -q -- '-Nlibwebkitgtk-doc' "$rules" \
     || { echo "error: -Nlibwebkitgtk-doc skip missing" >&2; return 1; }
+  grep -q -- '-Nlibjavascriptcoregtk-6.0-1' "$rules" \
+    || { echo "error: must skip libjavascriptcoregtk-6.0-1 (system JSC)" >&2; return 1; }
 
   case "$layout" in
     soup3-gtk4)
@@ -63,8 +69,14 @@ assert_patched_rules_markers() {
 assert_patched_control_gtk4_only() {
   local control="$1" layout="$2"
   [[ -f "$control" ]] || { echo "error: missing debian/control" >&2; return 1; }
-  grep -q '^Package: libwebkitgtk-6.0-4$' "$control" \
-    || { echo "error: gtk4 runtime package missing from control" >&2; return 1; }
+  grep -q '^Package: libwebkitgtk-6.0-webdriver4$' "$control" \
+    || { echo "error: gtk4 webdriver runtime package missing from control" >&2; return 1; }
+  grep -q '^Package: libwebkitgtk-6.0-webdriver-dev$' "$control" \
+    || { echo "error: gtk4 webdriver dev package missing from control" >&2; return 1; }
+  if grep -q '^Package: libwebkitgtk-6.0-4$' "$control"; then
+    echo "error: stock libwebkitgtk-6.0-4 must not appear in gtk4-only control" >&2
+    return 1
+  fi
 
   case "$layout" in
     soup3-gtk4)

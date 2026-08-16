@@ -1,6 +1,6 @@
---- a/debian/rules	2026-08-15 07:05:47.123621232 +0000
-+++ questing-rules.patched	2026-08-15 07:05:47.203629204 +0000
-@@ -6,19 +6,23 @@
+--- a/debian/rules
++++ b/debian/rules
+@@ -6,19 +6,29 @@
  include /usr/share/dpkg/buildflags.mk
  
  export CCACHE_NOHASHDIR=1
@@ -20,13 +20,19 @@
  # If NO, build libwebkitgtk-doc, libjavascriptcoregtk-bin and webkitgtk-webdriver
  USE_OLD_PKG_NAMES=NO
  
++# webkitgtk-automation: parallel-install stack (alongside system libwebkitgtk-6.0-4).
++WEBKITGTK_VARIANT_SUFFIX = -webdriver
++EXTRA_CMAKE_ARGUMENTS_GTK4_VARIANT = -DWEBKITGTK_VARIANT_SUFFIX=$(WEBKITGTK_VARIANT_SUFFIX)
++
  EXTRA_DH_ARGUMENTS =
-+# webkitgtk-automation: ship libwebkitgtk-6.0 only; keep system jsc/webdriver (4.1).
-+EXTRA_DH_ARGUMENTS += -Nlibwebkitgtk-doc -Nlibjavascriptcoregtk-bin -Nwebkitgtk-webdriver
++# webkitgtk-automation: ship libwebkitgtk-6.0-webdriver only; keep system jsc.
++EXTRA_DH_ARGUMENTS += -Nlibwebkitgtk-doc -Nlibjavascriptcoregtk-bin -Nwebkitgtk-webdriver \
++    -Nlibjavascriptcoregtk-6.0-1 -Nlibjavascriptcoregtk-6.0-dev \
++    -Ngir1.2-javascriptcoregtk-6.0 -Ngir1.2-webkit-6.0
  EXTRA_CMAKE_ARGUMENTS = -DPORT=GTK \
  	   -DCMAKE_INSTALL_LIBEXECDIR=lib/$(DEB_HOST_MULTIARCH) \
  	   -DCMAKE_C_FLAGS_RELEASE="" \
-@@ -59,11 +63,14 @@
+@@ -60,11 +70,14 @@
  
  # The debug packages produced by webkit are huge and cause problems in
  # most buildds. Use -g1 in all architectures to make them smaller.
@@ -44,19 +50,78 @@
  
  # Don't build with -gsplit-dwarf (see #1016936)
  EXTRA_CMAKE_ARGUMENTS += -DDEBUG_FISSION=OFF
-@@ -209,6 +216,11 @@
+@@ -204,6 +217,10 @@
  	WEBDRIVER_DEP_PKG = libwebkitgtk-6.0-4
  endif
  
 +# WebKit #318171: compile INTERACTIONS into libwebkitgtk-6.0.
-+# Installed WebKitWebDriver binary still comes from the system package when soup3 is off.
 +ifeq ($(ENABLE_GTK4),YES)
 +	ENABLE_WEBDRIVER_GTK4 = -DENABLE_WEBDRIVER=ON
 +endif
  # The debhelper files for the soup2, soup3 and gtk4 builds are identical
  # (apart from the API version) so we generate the last two from the first.
  WEBKIT_DH_FILES = \
-@@ -344,7 +356,8 @@
+@@ -238,6 +255,14 @@
+ 			    -e '/gtk3-only/s/^ /\#/' \
+ 			    -e '/gtk4-only/s/^\#/ /'
+ 
++# webkitgtk-automation: rename gtk4 packages/paths for parallel install.
++WEBKIT_DH_RENAME_WEBDRIVER_NAMES = sed -e 's/libwebkitgtk-6.0-4/libwebkitgtk-6.0-webdriver4/g' \
++			    -e 's/libwebkitgtk-6.0-dev/libwebkitgtk-6.0-webdriver-dev/g'
++WEBKIT_DH_RENAME_WEBDRIVER = sed -e 's/libwebkitgtk-6.0-4/libwebkitgtk-6.0-webdriver4/g' \
++			    -e 's/libwebkitgtk-6.0-dev/libwebkitgtk-6.0-webdriver-dev/g' \
++			    -e 's/libwebkitgtk-6.0\.so/libwebkitgtk-6.0-webdriver.so/g' \
++			    -e 's/webkitgtk-6\.0\//webkitgtk-6.0-webdriver/g'
++
+ # The debhelper files for the documentation package
+ WEBKIT_DOC_DH_FILES = \
+ 	libwebkitgtk-doc.doc-base.javascriptcoregtk \
+@@ -288,10 +313,13 @@
+ 		    -e 's/@WK_API_VERSION@/6.0/g' \
+ 		    -e 's/@LIBJSC_PKG@/libjavascriptcoregtk-6.0-1/g' \
+ 		    -e 's/@WEBKIT@/webkit/g' \
+-		    -e 's/@LIBWEBKITGTK_PKG@/libwebkitgtk-6.0-4/g' \
++		    -e 's/@LIBWEBKITGTK_PKG@/libwebkitgtk-6.0-webdriver4/g' \
+ 		    -e 's/@GTK_VERSION@/4/g' \
+ 		    -e 's/@SOUP_VERSION@/3/g' \
++		    -e 's/libwebkitgtk-6\.0-dev/libwebkitgtk-6.0-webdriver-dev/g' \
+ 		>> debian/control
++	sed -i 's/libjavascriptcoregtk-6.0-1 (= $${binary:Version})/libjavascriptcoregtk-6.0-1/g' debian/control
++	sed -i '/^Package: libwebkitgtk-6.0-webdriver-dev/,/^$$/ s/^Depends: libwebkitgtk-6.0-webdriver4 (= $${binary:Version}),/Depends: libwebkitgtk-6.0-webdriver4 (= $${binary:Version}),\n         libwebkitgtk-6.0-dev,\n         libjavascriptcoregtk-6.0-dev,/' debian/control
+ 	sed -i '$${/^$$/d}' debian/control # Remove last empty line
+ 
+ override_dh_gencontrol:
+@@ -299,6 +327,20 @@
+ 
+ override_dh_auto_configure:
+ 	echo debian/clean > debian/clean
++	cat > debian/webkitgtk-6.0-webdriver.pc <<'EOF'
++prefix=/usr
++libdir=$${prefix}/lib/$(DEB_HOST_MULTIARCH)
++includedir=$${prefix}/include
++
++Name: webkitgtk-6.0-webdriver
++Description: WebKitGTK 6.0 with WebDriver interactions (parallel install)
++Version: $(shell dpkg-parsechangelog -S Version)
++Requires: gtk4, libsoup-3.0, javascriptcoregtk-6.0
++Libs: -L$${libdir} -lwebkitgtk-6.0-webdriver
++Cflags: -I$${includedir}/webkitgtk-6.0
++EOF
++	echo 'debian/webkitgtk-6.0-webdriver.pc usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/' > debian/libwebkitgtk-6.0-webdriver-dev.install
++	echo debian/webkitgtk-6.0-webdriver.pc >> debian/clean
+ 	if [ "$(ENABLE_SOUP3)" = "YES" -o "$(ENABLE_GTK4)" = "YES" ]; then \
+ 		for src in $(WEBKIT_DH_FILES); do \
+ 			dst=`echo $$src | $(WEBKIT_DH_RENAME_SOUP3)` ; \
+@@ -332,19 +374,24 @@
+ 		$(ENABLE_WEBDRIVER_SOUP3) -DENABLE_DOCUMENTATION=OFF
+ 	$(GTK4_BUILD) WK_USE_CCACHE=NO dh_auto_configure -Bbuild-gtk4 -- \
+ 		$(EXTRA_CMAKE_ARGUMENTS) \
+-		$(ENABLE_WEBDRIVER_GTK4)
++		$(ENABLE_WEBDRIVER_GTK4) \
++		$(EXTRA_CMAKE_ARGUMENTS_GTK4_VARIANT)
+ 
+ override_dh_auto_build:
+ 	$(SOUP2_BUILD) CCACHE_BASEDIR=$(CURDIR)/build-soup2 \
  		dh_auto_build -Bbuild-soup2 $(EXTRA_BUILD_ARGUMENTS)
  	$(SOUP3_BUILD) CCACHE_BASEDIR=$(CURDIR)/build-soup3 \
  		dh_auto_build -Bbuild-soup3 $(EXTRA_BUILD_ARGUMENTS)
@@ -66,7 +131,15 @@
  
  override_dh_auto_install:
  	$(SOUP2_BUILD) dh_auto_install -Bbuild-soup2
-@@ -357,7 +370,8 @@
+ 	$(SOUP3_BUILD) dh_auto_install -Bbuild-soup3
+ 	$(GTK4_BUILD)  dh_auto_install -Bbuild-gtk4
++	find debian/tmp -type f \( -name 'libjavascriptcoregtk-6.0.so*' -o -name 'javascriptcoregtk-6.0.pc' -o -name 'webkitgtk-6.0.pc' -o -name 'webkitgtk-web-process-extension-6.0.pc' \) -delete
++	find debian/tmp -path '*/girepository-1.0/*JavaScriptCore*6.0*' -delete
++	find debian/tmp -path '*/girepository-1.0/*WebKit*6.0*' -delete
+ 
+ override_dh_auto_clean: debian/control
+ 	$(SOUP2_BUILD) dh_auto_clean -Bbuild-soup2
+@@ -352,7 +399,8 @@
  	$(GTK4_BUILD)  dh_auto_clean -Bbuild-gtk4
  	find Source Tools -type f -name "*.pyc" -exec rm {} \;
  	find Source Tools -depth -type d -name __pycache__ -exec rmdir {} \;
@@ -76,3 +149,13 @@
  
  # Create a dummy doc directory in case the "nodoc" build option is set.
  override_dh_install-indep:
+@@ -368,8 +416,7 @@
+ 	$(SOUP2_BUILD) dh_makeshlibs -plibjavascriptcoregtk-4.0-18 -VNone
+ 	$(SOUP3_BUILD) dh_makeshlibs -plibwebkit2gtk-4.1-0 -Xinjected-bundle
+ 	$(SOUP3_BUILD) dh_makeshlibs -plibjavascriptcoregtk-4.1-0 -VNone
+-	$(GTK4_BUILD)  dh_makeshlibs -plibwebkitgtk-6.0-4 -Xinjected-bundle
+-	$(GTK4_BUILD)  dh_makeshlibs -plibjavascriptcoregtk-6.0-1 -VNone
++	$(GTK4_BUILD)  dh_makeshlibs -plibwebkitgtk-6.0-webdriver4 -Xinjected-bundle
+ 
+ override_dh_auto_test:
+ 

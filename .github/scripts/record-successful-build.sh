@@ -6,12 +6,12 @@
 #
 # Env:
 #   SERIES   Ubuntu series that just built (required)
-#   SUFFIX   Debian version suffix (default: +webkitgtk1)
+#   SUFFIX   Debian version suffix (default: +webdriver1)
 #   MONITOR_SERIES  Series whose version the upstream monitor tracks (default: resolute)
 set -euo pipefail
 
 SERIES="${SERIES:?SERIES is required}"
-SUFFIX="${SUFFIX:-+webkitgtk1}"
+SUFFIX="${SUFFIX:-+webdriver1}"
 MONITOR_SERIES="${MONITOR_SERIES:-resolute}"
 
 if [[ "$SERIES" != "$MONITOR_SERIES" ]]; then
@@ -20,7 +20,7 @@ if [[ "$SERIES" != "$MONITOR_SERIES" ]]; then
 fi
 
 shopt -s nullglob
-DEBS=(dist/libwebkitgtk-6.0-4_*.deb)
+DEBS=(dist/libwebkitgtk-6.0-webdriver4_*.deb)
 if [[ ${#DEBS[@]} -eq 0 ]]; then
   echo "error: no runtime .deb for tracked version update" >&2
   exit 1

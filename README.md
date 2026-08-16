@@ -1,17 +1,17 @@
 # webkitgtk-automation
 
-Rebuild Ubuntu **`libwebkitgtk-6.0`** with WebDriver mouse/keyboard/wheel support enabled.
+Rebuild Ubuntu **`libwebkitgtk-6.0-webdriver`** — a parallel-install stack with WebDriver mouse/keyboard/wheel support enabled.
 
-Ubuntu’s `debian/rules` turns `-DENABLE_WEBDRIVER=ON` on for soup3 (`libwebkit2gtk-4.1`) but leaves it **off** for GTK4 (`libwebkitgtk-6.0`). Browser-side Element Click / Send Keys then return `unsupported operation`. This repo patches that and publishes replacement `.deb`s.
+Ubuntu’s `debian/rules` turns `-DENABLE_WEBDRIVER=ON` on for soup3 (`libwebkit2gtk-4.1`) but leaves it **off** for GTK4 (`libwebkitgtk-6.0`). Browser-side Element Click / Send Keys then return `unsupported operation`. This repo patches that and publishes parallel-install `.deb`s that coexist with system `libwebkitgtk-6.0-4`.
 
 Upstream: [WebKit #318171](https://bugs.webkit.org/show_bug.cgi?id=318171)
 
 ## What you get
 
-- `libwebkitgtk-6.0-4_*.deb` — runtime library with INTERACTIONS compiled in
-- `libwebkitgtk-6.0-dev_*.deb` — matching `-dev` package
+- `libwebkitgtk-6.0-webdriver4_*.deb` — runtime library (`libwebkitgtk-6.0-webdriver.so.4`) with INTERACTIONS compiled in
+- `libwebkitgtk-6.0-webdriver-dev_*.deb` — thin pkg-config package (`webkitgtk-6.0-webdriver.pc` only)
 
-System **`webkitgtk-webdriver`** is unchanged (still depends on `libwebkit2gtk-4.1-0`). Only one `/usr/bin/WebKitWebDriver` is shipped.
+Uses system **`libjavascriptcoregtk-6.0-1`** and **`libwebkitgtk-6.0-dev`** (headers/vapi). System **`webkitgtk-webdriver`** is unchanged.
 
 ## Supported Ubuntu series
 
@@ -28,22 +28,21 @@ Install the `.deb` built for **your** Ubuntu series. A 25.10 package will not in
 
 ## Install from a Release
 
-1. Download `libwebkitgtk-6.0-4_*.deb` (and `-dev` if you need headers) from [Releases](../../releases).
+1. Download `libwebkitgtk-6.0-webdriver4_*.deb` and `libwebkitgtk-6.0-webdriver-dev_*.deb` from [Releases](../../releases).
 2. Install:
 
 ```bash
-sudo apt install ./libwebkitgtk-6.0-4_*.deb
-# optional:
-sudo apt install ./libwebkitgtk-6.0-dev_*.deb
+sudo apt install ./libwebkitgtk-6.0-webdriver4_*.deb ./libwebkitgtk-6.0-webdriver-dev_*.deb
 ```
 
-3. Keep system `webkitgtk-webdriver` installed.
-4. Prove with any WebDriver client: New Session → find `#q` → Element Click → Element Send Keys. Typed text should appear (not `unsupported operation`).
+3. Keep system `libwebkitgtk-6.0-4`, `libjavascriptcoregtk-6.0-1`, and `webkitgtk-webdriver` installed.
+4. Meson consumers: `dependency('webkitgtk-6.0-webdriver')` (Vala still uses `--pkg=webkitgtk-6.0` for API).
+5. Prove with any WebDriver client: New Session → find `#q` → Element Click → Element Send Keys.
 
-To revert to Ubuntu’s package:
+To remove the parallel stack:
 
 ```bash
-sudo apt install --reinstall libwebkitgtk-6.0-4
+sudo apt remove libwebkitgtk-6.0-webdriver4 libwebkitgtk-6.0-webdriver-dev
 ```
 
 ## Pretest (no full build)
@@ -64,7 +63,7 @@ Needs a lot of disk, RAM, and time (full WebKit package build).
 ```bash
 ./build.sh
 # or explicitly:
-SERIES="$(. /etc/os-release && echo "$VERSION_CODENAME")" SUFFIX='+webkitgtk1' ./build.sh
+SERIES="$(. /etc/os-release && echo "$VERSION_CODENAME")" SUFFIX='+webdriver1' ./build.sh
 ```
 
 Artifacts land in `dist/`.

@@ -1,11 +1,10 @@
---- a/debian/rules	2026-08-15 05:59:59.110496665 +0000
-+++ b/debian/rules	2026-08-15 05:59:59.138496024 +0000
-@@ -5,14 +5,21 @@
+--- a/debian/rules
++++ b/debian/rules
+@@ -5,14 +5,26 @@
  include /usr/share/dpkg/architecture.mk
  include /usr/share/dpkg/buildflags.mk
  
 +export CCACHE_NOHASHDIR=1
-+# Allow callers (webkitgtk-automation) to point at a persistent cache outside the tree.
 +CCACHE_DIR ?= $(CURDIR)/ccache
 +export CCACHE_DIR
 +
@@ -17,50 +16,89 @@
  # YES => build libwebkit2gtk-4.0-doc, libjavascriptcoregtk-4.0-bin and webkit2gtk-driver (for trixie)
  BUILD_TRANSITIONAL_PKGS=NO
  
++# webkitgtk-automation: parallel-install stack.
++WEBKITGTK_VARIANT_SUFFIX = -webdriver
++EXTRA_CMAKE_ARGUMENTS_GTK4_VARIANT = -DWEBKITGTK_VARIANT_SUFFIX=$(WEBKITGTK_VARIANT_SUFFIX)
++
  EXTRA_DH_ARGUMENTS =
-+# webkitgtk-automation: ship libwebkitgtk-6.0 only; keep system webkitgtk-webdriver.
-+EXTRA_DH_ARGUMENTS += -Nlibwebkitgtk-doc
++# webkitgtk-automation: ship libwebkitgtk-6.0-webdriver only; keep system webkitgtk-webdriver.
++EXTRA_DH_ARGUMENTS += -Nlibwebkitgtk-doc \
++    -Nlibjavascriptcoregtk-6.0-1 -Nlibjavascriptcoregtk-6.0-dev \
++    -Ngir1.2-javascriptcoregtk-6.0 -Ngir1.2-webkit-6.0
  EXTRA_CMAKE_ARGUMENTS = -DPORT=GTK \
  	   -DCMAKE_INSTALL_LIBEXECDIR=lib/$(DEB_HOST_MULTIARCH) \
  	   -DCMAKE_C_FLAGS_RELEASE="" \
-@@ -70,11 +77,14 @@
+@@ -75,11 +87,13 @@
  
  # The debug packages produced by webkit are huge and cause problems in
  # most buildds. Use -g1 in all architectures to make them smaller.
 -CFLAGS := $(CFLAGS:-g=-g1)
 -CXXFLAGS := $(CXXFLAGS:-g=-g1)
-+# webkitgtk-automation: skip debug info in objects; pair with DEB_BUILD_OPTIONS=noautodbgsym.
++# webkitgtk-automation: skip debug info.
 +CFLAGS := $(CFLAGS:-g=-g0)
 +CXXFLAGS := $(CXXFLAGS:-g=-g0)
  
  # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=949621
 -LDFLAGS += -Wl,--reduce-memory-overheads
-+# webkitgtk-automation: omit BFD-only reduce-memory overheads; use gold.
 +LDFLAGS += -fuse-ld=gold
 +export LDFLAGS
  
  # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1104703
  ifneq (,$(filter $(DEB_HOST_ARCH),arm64))
-@@ -212,6 +222,12 @@
- 			    -e 's/webkit2/webkit/g' \
- 			    -e 's/4\.1/6.0/g'
+@@ -184,6 +198,10 @@
+ 	EXTRA_DH_ARGUMENTS += -Nlibwebkitgtk-doc
+ endif
  
 +# WebKit #318171: compile INTERACTIONS into libwebkitgtk-6.0.
-+# Installed WebKitWebDriver binary still comes from the system package when gtk3 is off.
 +ifeq ($(ENABLE_GTK4),YES)
 +	ENABLE_WEBDRIVER_GTK4 = -DENABLE_WEBDRIVER=ON
 +endif
-+
- %:
- 	dh $@ --with gir --buildsystem=cmake+ninja $(EXTRA_DH_ARGUMENTS)
+ # The debhelper files for the gtk3 and gtk4 builds are almost
+ # identical so we generate the latter from the former.
+ WEBKIT_DH_FILES = \
+@@ -237,9 +255,12 @@
+ 		sed -e 's/@WK_API_VERSION@/6.0/g' \
+ 		    -e 's/@LIBJSC_PKG@/libjavascriptcoregtk-6.0-1/g' \
+ 		    -e 's/@WEBKIT@/webkit/g' \
+-		    -e 's/@LIBWEBKITGTK_PKG@/libwebkitgtk-6.0-4/g' \
++		    -e 's/@LIBWEBKITGTK_PKG@/libwebkitgtk-6.0-webdriver4/g' \
+ 		    -e 's/@GTK_VERSION@/4/g' \
++		    -e 's/libwebkitgtk-6\.0-dev/libwebkitgtk-6.0-webdriver-dev/g' \
+ 		>> debian/control
++	sed -i 's/libjavascriptcoregtk-6.0-1 (= $${binary:Version})/libjavascriptcoregtk-6.0-1/g' debian/control
++	sed -i '/^Package: libwebkitgtk-6.0-webdriver-dev/,/^$$/ s/^Depends: libwebkitgtk-6.0-webdriver4 (= $${binary:Version}),/Depends: libwebkitgtk-6.0-webdriver4 (= $${binary:Version}),\n         libwebkitgtk-6.0-dev,\n         libjavascriptcoregtk-6.0-dev,/' debian/control
+ 	sed -i '$${/^$$/d}' debian/control # Remove last empty line
  
-@@ -253,12 +269,14 @@
+ override_dh_gencontrol:
+@@ -247,6 +268,20 @@
+ 
+ override_dh_auto_configure:
+ 	echo debian/clean > debian/clean
++	cat > debian/webkitgtk-6.0-webdriver.pc <<'EOF'
++prefix=/usr
++libdir=$${prefix}/lib/$(DEB_HOST_MULTIARCH)
++includedir=$${prefix}/include
++
++Name: webkitgtk-6.0-webdriver
++Description: WebKitGTK 6.0 with WebDriver interactions (parallel install)
++Version: $(shell dpkg-parsechangelog -S Version)
++Requires: gtk4, libsoup-3.0, javascriptcoregtk-6.0
++Libs: -L$${libdir} -lwebkitgtk-6.0-webdriver
++Cflags: -I$${includedir}/webkitgtk-6.0
++EOF
++	echo 'debian/webkitgtk-6.0-webdriver.pc usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/' > debian/libwebkitgtk-6.0-webdriver-dev.install
++	echo debian/webkitgtk-6.0-webdriver.pc >> debian/clean
+ 	if [ "$(ENABLE_GTK4)" = "YES" ]; then \
+ 		for src in $(WEBKIT_DH_FILES); do \
+ 			dst=`echo $$src | $(WEBKIT_DH_RENAME_GTK4)` ; \
+@@ -258,22 +293,29 @@
  		-DENABLE_DOCUMENTATION=OFF -DUSE_GTK4=OFF \
  		$(EXTRA_CMAKE_ARGUMENTS)
  	$(GTK4_BUILD) dh_auto_configure -Bbuild-gtk4 -- \
 -		-DENABLE_DOCUMENTATION=$(BUILD_DOCS) -DENABLE_WEBDRIVER=OFF \
 +		-DENABLE_DOCUMENTATION=$(BUILD_DOCS) \
 +		$(ENABLE_WEBDRIVER_GTK4) \
++		$(EXTRA_CMAKE_ARGUMENTS_GTK4_VARIANT) \
  		$(EXTRA_CMAKE_ARGUMENTS)
  
  override_dh_auto_build:
@@ -71,12 +109,27 @@
  
  override_dh_auto_install:
  	$(GTK3_BUILD) dh_auto_install -Bbuild-gtk3
-@@ -269,6 +287,8 @@
+ 	$(GTK4_BUILD) dh_auto_install -Bbuild-gtk4
++	find debian/tmp -type f \( -name 'libjavascriptcoregtk-6.0.so*' -o -name 'javascriptcoregtk-6.0.pc' -o -name 'webkitgtk-6.0.pc' -o -name 'webkitgtk-web-process-extension-6.0.pc' \) -delete
++	find debian/tmp -path '*/girepository-1.0/*JavaScriptCore*6.0*' -delete
++	find debian/tmp -path '*/girepository-1.0/*WebKit*6.0*' -delete
+ 
+ override_dh_auto_clean: debian/control
+ 	$(GTK3_BUILD) dh_auto_clean -Bbuild-gtk3
  	$(GTK4_BUILD) dh_auto_clean -Bbuild-gtk4
  	find Source Tools -type f -name "*.pyc" -exec rm {} \;
  	find Source Tools -depth -type d -name __pycache__ -exec rmdir {} \;
-+	# Only remove an in-tree cache; leave an external CCACHE_DIR alone.
 +	if [ "$(CCACHE_DIR)" = "$(CURDIR)/ccache" ] || [ "$(CCACHE_DIR)" = "ccache" ]; then rm -rf ccache; fi
  
  # Create a dummy doc directory in case the "nodoc" build option is set.
  override_dh_install-indep:
+@@ -287,8 +329,7 @@
+ override_dh_makeshlibs:
+ 	$(GTK3_BUILD) dh_makeshlibs -plibwebkit2gtk-4.1-0 -Xinjected-bundle
+ 	$(GTK3_BUILD) dh_makeshlibs -plibjavascriptcoregtk-4.1-0 -VNone
+-	$(GTK4_BUILD) dh_makeshlibs -plibwebkitgtk-6.0-4 -Xinjected-bundle
+-	$(GTK4_BUILD) dh_makeshlibs -plibjavascriptcoregtk-6.0-1 -VNone
++	$(GTK4_BUILD) dh_makeshlibs -plibwebkitgtk-6.0-webdriver4 -Xinjected-bundle
+ 
+ # WebKitGTK release tarballs don't ship the files needed to run tests
+ override_dh_auto_test:

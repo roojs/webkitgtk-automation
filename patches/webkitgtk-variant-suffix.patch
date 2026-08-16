@@ -1,0 +1,54 @@
+--- a/Source/cmake/OptionsGTK.cmake
++++ b/Source/cmake/OptionsGTK.cmake
+@@ -211,6 +211,10 @@
+ EXPOSE_STRING_VARIABLE_TO_BUILD(WEBKITGTK_VARIANT_SUFFIX)
+ set(WEBKITGTK_LIBRARY_QUALIFIER "${WEBKITGTK_API_VERSION}${WEBKITGTK_VARIANT_SUFFIX}")
+ 
++set(WEBKITGTK_VARIANT_SUFFIX "" CACHE STRING "Optional parallel-install library suffix (e.g. -webdriver)")
++EXPOSE_STRING_VARIABLE_TO_BUILD(WEBKITGTK_VARIANT_SUFFIX)
++set(WEBKITGTK_LIBRARY_QUALIFIER "${WEBKITGTK_API_VERSION}${WEBKITGTK_VARIANT_SUFFIX}")
++
+ if (WEBKITGTK_API_VERSION VERSION_EQUAL "4.0")
+     CALCULATE_LIBRARY_VERSIONS_FROM_LIBTOOL_TRIPLE(WEBKIT 109 6 72)
+     CALCULATE_LIBRARY_VERSIONS_FROM_LIBTOOL_TRIPLE(JAVASCRIPTCORE 45 4 27)
+--- a/Source/WebKit/PlatformGTK.cmake
++++ b/Source/WebKit/PlatformGTK.cmake
+@@ -10,7 +10,7 @@
+     include(Platform/Skia.cmake)
+ endif ()
+ 
+-set(WebKit_OUTPUT_NAME webkit${WEBKITGTK_API_INFIX}gtk-${WEBKITGTK_API_VERSION})
++set(WebKit_OUTPUT_NAME webkit${WEBKITGTK_API_INFIX}gtk-${WEBKITGTK_API_VERSION}${WEBKITGTK_VARIANT_SUFFIX})
+ set(WebProcess_OUTPUT_NAME WebKitWebProcess)
+ set(NetworkProcess_OUTPUT_NAME WebKitNetworkProcess)
+ set(GPUProcess_OUTPUT_NAME WebKitGPUProcess)
+@@ -39,7 +39,7 @@
+ add_definitions(-DLOCALEDIR="${CMAKE_INSTALL_FULL_LOCALEDIR}")
+ add_definitions(-DDATADIR="${CMAKE_INSTALL_FULL_DATADIR}")
+ add_definitions(-DLIBDIR="${LIB_INSTALL_DIR}")
+-add_definitions(-DPKGLIBDIR="${LIB_INSTALL_DIR}/webkit${WEBKITGTK_API_INFIX}gtk-${WEBKITGTK_API_VERSION}")
++add_definitions(-DPKGLIBDIR="${LIB_INSTALL_DIR}/webkit${WEBKITGTK_API_INFIX}gtk-${WEBKITGTK_LIBRARY_QUALIFIER}")
+ 
+ if (NOT DEVELOPER_MODE AND NOT CMAKE_SYSTEM_NAME MATCHES "Darwin")
+     WEBKIT_ADD_TARGET_PROPERTIES(WebKit LINK_FLAGS "-Wl,--version-script,${CMAKE_CURRENT_SOURCE_DIR}/webkitglib-symbols.map")
+@@ -520,13 +520,15 @@
+ endif ()
+ 
+ install(TARGETS webkit${WEBKITGTK_API_INFIX}gtkinjectedbundle
+-        DESTINATION "${LIB_INSTALL_DIR}/webkit${WEBKITGTK_API_INFIX}gtk-${WEBKITGTK_API_VERSION}/injected-bundle"
++        DESTINATION "${LIB_INSTALL_DIR}/webkit${WEBKITGTK_API_INFIX}gtk-${WEBKITGTK_LIBRARY_QUALIFIER}/injected-bundle"
+ )
+ if (ENABLE_2022_GLIB_API)
+-    install(FILES "${CMAKE_BINARY_DIR}/Source/WebKit/webkitgtk-${WEBKITGTK_API_VERSION}.pc"
+-                  "${CMAKE_BINARY_DIR}/Source/WebKit/webkitgtk-web-process-extension-${WEBKITGTK_API_VERSION}.pc"
+-            DESTINATION "${LIB_INSTALL_DIR}/pkgconfig"
+-    )
++    if (NOT WEBKITGTK_VARIANT_SUFFIX)
++        install(FILES "${CMAKE_BINARY_DIR}/Source/WebKit/webkitgtk-${WEBKITGTK_API_VERSION}.pc"
++                      "${CMAKE_BINARY_DIR}/Source/WebKit/webkitgtk-web-process-extension-${WEBKITGTK_API_VERSION}.pc"
++                DESTINATION "${LIB_INSTALL_DIR}/pkgconfig"
++        )
++    endif ()
+ else ()
+     install(FILES "${CMAKE_BINARY_DIR}/Source/WebKit/webkit2gtk-${WEBKITGTK_API_VERSION}.pc"
+                   "${CMAKE_BINARY_DIR}/Source/WebKit/webkit2gtk-web-extension-${WEBKITGTK_API_VERSION}.pc"

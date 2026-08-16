@@ -7,4 +7,4 @@
 # Do NOT bump for packaging-only debian/rules edits (dh_install skips, jdupes
 # guards, control generation, doc package tweaks) — those re-sync on resume
 # without invalidating build-gtk4/ or ccache.
-v4
+v5

@@ -29,8 +29,9 @@ if [[ -z "$DEFAULT_SERIES" ]] || ! series_registered "$DEFAULT_SERIES"; then
   DEFAULT_SERIES="resolute"
 fi
 SERIES="${SERIES:-${1:-$DEFAULT_SERIES}}"
-SUFFIX="${SUFFIX:-${2:-+webkitgtk1}}"
+SUFFIX="${SUFFIX:-${2:-+webdriver1}}"
 PATCH="$(patch_file_for_series "$SERIES")"
+CMAKE_PATCH="$REPO_ROOT/patches/webkitgtk-variant-suffix.patch"
 COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
 # shellcheck source=scripts/lib/debian-tarball.sh
 source "$REPO_ROOT/scripts/lib/debian-tarball.sh"
@@ -60,7 +61,7 @@ Usage: ./build.sh [SERIES] [SUFFIX]
 
 Env:
   SERIES              Ubuntu series (default: host VERSION_CODENAME, else resolute)
-  SUFFIX              Version suffix (default: +webkitgtk1)
+  SUFFIX              Version suffix (default: +webdriver1)
   WORK_DIR            Unpacked source + object dirs (default: ./work)
   CACHE_DIR           Persistent caches (default: ./cache)
   CCACHE_DIR          ccache directory (default: ./cache/ccache)
@@ -82,6 +83,11 @@ fi
 
 if [[ ! -f "$PATCH" ]]; then
   echo "error: missing patch: $PATCH" >&2
+  exit 1
+fi
+
+if [[ ! -f "$CMAKE_PATCH" ]]; then
+  echo "error: missing cmake patch: $CMAKE_PATCH" >&2
   exit 1
 fi
 
@@ -208,7 +214,29 @@ run_dpkg_buildpackage() {
   dpkg-buildpackage "${BUILD_ARGS[@]}"
 }
 
-PATCH_SHA256="$(sha256sum "$PATCH" | awk '{print $1}')"
+PATCH_SHA256="$(cat "$PATCH" "$CMAKE_PATCH" | sha256sum | awk '{print $1}')"
+
+apply_rules_patch() {
+  echo "==> applying $PATCH"
+  patch -p1 < "$PATCH"
+}
+
+apply_cmake_patch() {
+  echo "==> applying $CMAKE_PATCH"
+  patch -p1 < "$CMAKE_PATCH"
+}
+
+revert_cmake_patch_if_applied() {
+  if patch -R -p1 --dry-run < "$CMAKE_PATCH" >/dev/null 2>&1; then
+    echo "==> reverting previous $CMAKE_PATCH"
+    patch -R -p1 < "$CMAKE_PATCH"
+  fi
+}
+
+apply_all_patches() {
+  apply_rules_patch
+  apply_cmake_patch
+}
 
 ensure_debian_control() {
   # Patched debian/rules enable/disable binary packages; tarball control can be stale.
@@ -352,10 +380,13 @@ drop_stale_packaging_state_after_rules_refresh() {
   rm -f \
     debian/libwebkitgtk-6.0-4.install \
     debian/libwebkitgtk-6.0-dev.install \
+    debian/libwebkitgtk-6.0-webdriver4.install \
+    debian/libwebkitgtk-6.0-webdriver-dev.install \
     debian/gir1.2-webkit-6.0.install \
     debian/libjavascriptcoregtk-6.0-1.install \
     debian/libjavascriptcoregtk-6.0-dev.install \
     debian/gir1.2-javascriptcoregtk-6.0.install \
+    debian/webkitgtk-6.0-webdriver.pc \
     debian/clean
   if [[ -f build-gtk4/CMakeCache.txt ]]; then
     rm -f build-gtk4/CMakeCache.txt
@@ -369,6 +400,8 @@ if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]] && marker_matches "$SRC_DIR"; then
   stored_patch="$(marker_patch_sha256 "$SRC_DIR" || true)"
   if [[ -n "$stored_patch" && "$stored_patch" != "$PATCH_SHA256" ]]; then
     refresh_debian_rules_from_patch "$SRC_DIR" "$PATCH" || exit 1
+    revert_cmake_patch_if_applied
+    apply_cmake_patch
     RULES_REFRESHED=1
     write_marker "$SRC_DIR"
   else
@@ -403,13 +436,12 @@ else
   cd "$SRC_DIR"
   echo "==> source tree: $SRC_DIR"
 
-  echo "==> applying $PATCH"
-  patch -p1 < "$PATCH"
+  apply_all_patches
 
   BASE_VERSION="$(dpkg-parsechangelog -S Version)"
   NEW_VERSION="${BASE_VERSION}${SUFFIX}"
   echo "==> bumping changelog to $NEW_VERSION"
-  dch -v "$NEW_VERSION" "Enable ENABLE_WEBDRIVER for GTK4/libwebkitgtk-6.0 (WebKit #318171)."
+  dch -v "$NEW_VERSION" "Parallel-install libwebkitgtk-6.0-webdriver with ENABLE_WEBDRIVER (WebKit #318171)."
   dch -r --distribution "$SERIES" ""
 
   write_marker "$SRC_DIR"
@@ -448,18 +480,18 @@ ccache -s || true
 
 PARENT="$(dirname "$SRC_DIR")"
 shopt -s nullglob
-RUNTIME_DEBS=("$PARENT"/libwebkitgtk-6.0-4_*.deb)
-DEV_DEBS=("$PARENT"/libwebkitgtk-6.0-dev_*.deb)
+RUNTIME_DEBS=("$PARENT"/libwebkitgtk-6.0-webdriver4_*.deb)
+DEV_DEBS=("$PARENT"/libwebkitgtk-6.0-webdriver-dev_*.deb)
 shopt -u nullglob
 
 if [[ ${#RUNTIME_DEBS[@]} -eq 0 || ${#DEV_DEBS[@]} -eq 0 ]]; then
-  echo "error: expected libwebkitgtk-6.0-4_*.deb and libwebkitgtk-6.0-dev_*.deb in $PARENT" >&2
+  echo "error: expected libwebkitgtk-6.0-webdriver4_*.deb and libwebkitgtk-6.0-webdriver-dev_*.deb in $PARENT" >&2
   ls -la "$PARENT"/*.deb 2>/dev/null || true
   exit 1
 fi
 
-rm -f "$DIST_DIR"/libwebkitgtk-6.0-4_*.deb "$DIST_DIR"/libwebkitgtk-6.0-dev_*.deb
+rm -f "$DIST_DIR"/libwebkitgtk-6.0-webdriver4_*.deb "$DIST_DIR"/libwebkitgtk-6.0-webdriver-dev_*.deb
 cp -a "${RUNTIME_DEBS[@]}" "${DEV_DEBS[@]}" "$DIST_DIR/"
 
 echo "==> done. packages in $DIST_DIR:"
-ls -la "$DIST_DIR"/libwebkitgtk-6.0-*.deb
+ls -la "$DIST_DIR"/libwebkitgtk-6.0-webdriver*.deb
