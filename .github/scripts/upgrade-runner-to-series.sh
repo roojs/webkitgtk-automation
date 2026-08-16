@@ -108,9 +108,30 @@ purge_series_transition_packages() {
   apt_get autoremove -y --purge || true
 }
 
+downgrade_leftover_base_packages() {
+  local -a leftover=()
+  local pkg ver
+  echo "==> downgrading leftover noble (24.04) packages to $TARGET_SERIES"
+  while read -r pkg ver; do
+    [[ -n "$pkg" && -n "$ver" ]] || continue
+    if [[ "$ver" == *24.04* ]]; then
+      leftover+=("$pkg")
+    fi
+  done < <(dpkg-query -W -f '${Package} ${Version}\n' 2>/dev/null || true)
+
+  if [[ ${#leftover[@]} -eq 0 ]]; then
+    echo "    none"
+    return 0
+  fi
+  echo "    ${leftover[*]}"
+  apt_get install -y --allow-downgrades "${leftover[@]}" || true
+}
+
 # shellcheck source=.github/scripts/normalize-runner-apt-sources.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/normalize-runner-apt-sources.sh"
 
+# Noble-updates can ship higher versions than an older target (plucky mesa
+# 25.0.7 vs noble 25.2.8). dist-upgrade will not replace those without this.
 apt_dist_upgrade() {
   local rc=0
   set +e
@@ -118,7 +139,7 @@ apt_dist_upgrade() {
     -o Acquire::AllowReleaseInfoChange=true \
     -o Dpkg::Options::=--force-confdef \
     -o Dpkg::Options::=--force-confold \
-    dist-upgrade -y
+    dist-upgrade -y --allow-downgrades
   rc=$?
   "${SUDO[@]}" dpkg --configure -a || true
   set -e
@@ -200,10 +221,11 @@ main() {
 
   write_ubuntu_archive_sources "$TARGET_SERIES"
 
-  echo "==> pass 2: dist-upgrade to $TARGET_SERIES (archive.ubuntu.com)"
+  echo "==> pass 2: dist-upgrade to $TARGET_SERIES (archive.ubuntu.com, allow downgrades)"
   apt_get update -qq
   purge_series_transition_packages
   apt_dist_upgrade
+  downgrade_leftover_base_packages "$BASE_SERIES"
 
   local upgraded_series
   upgraded_series="$(host_series)"

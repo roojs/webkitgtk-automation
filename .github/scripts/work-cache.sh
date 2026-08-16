@@ -53,8 +53,8 @@ cmd_pack() {
   local src name
   src="$(find_src_dir)"
   if [[ -z "$src" || ! -d "$src" ]]; then
-    echo "work-cache: nothing to pack (no work/webkit2gtk-* tree)" >&2
-    exit 2
+    echo "work-cache: nothing to pack (no work/webkit2gtk-* tree)"
+    exit 0
   fi
   if [[ ! -f "$src/$MARKER_NAME" ]]; then
     echo "work-cache: refusing to pack — missing $MARKER_NAME (tree not prepared by build.sh)" >&2
