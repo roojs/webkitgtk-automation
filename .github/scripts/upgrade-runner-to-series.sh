@@ -86,6 +86,28 @@ strip_conflicting_runner_tools() {
   done
 }
 
+# Noble ships sosreport; plucky renamed it to sos and the packages fight over
+# /etc/sos/sos.conf. ubuntu-server then stays unpacked. Neither is needed to
+# compile webkit2gtk.
+purge_series_transition_packages() {
+  echo "==> purging series-transition packages (sosreport → sos, ubuntu-server)"
+  local -a pkgs=(sosreport sos ubuntu-server)
+  local -a existing=()
+  local pkg
+  for pkg in "${pkgs[@]}"; do
+    if dpkg -s "$pkg" >/dev/null 2>&1; then
+      existing+=("$pkg")
+    fi
+  done
+  if [[ ${#existing[@]} -eq 0 ]]; then
+    echo "    none installed"
+    return 0
+  fi
+  echo "    purging: ${existing[*]}"
+  apt_get purge -y "${existing[@]}" || true
+  apt_get autoremove -y --purge || true
+}
+
 # shellcheck source=.github/scripts/normalize-runner-apt-sources.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/normalize-runner-apt-sources.sh"
 
@@ -102,6 +124,11 @@ apt_dist_upgrade() {
   set -e
 
   if [[ "$rc" -ne 0 ]]; then
+    if "${SUDO[@]}" dpkg --audit 2>/dev/null | grep -q .; then
+      echo "==> dist-upgrade left broken packages; dropping sos/ubuntu-server leftovers"
+      apt_get purge -y sosreport sos ubuntu-server || true
+      "${SUDO[@]}" dpkg --configure -a || true
+    fi
     if "${SUDO[@]}" dpkg --audit 2>/dev/null | grep -q .; then
       echo "error: dpkg audit reported broken packages after dist-upgrade (apt exit $rc)" >&2
       "${SUDO[@]}" dpkg --audit >&2 || true
@@ -167,6 +194,7 @@ main() {
   echo "==> pass 1: update/upgrade/dist-upgrade on $BASE_SERIES (archive.ubuntu.com)"
   apt_get update -qq
   disable_needrestart
+  purge_series_transition_packages
   apt_get upgrade -y
   apt_dist_upgrade
 
@@ -174,6 +202,7 @@ main() {
 
   echo "==> pass 2: dist-upgrade to $TARGET_SERIES (archive.ubuntu.com)"
   apt_get update -qq
+  purge_series_transition_packages
   apt_dist_upgrade
 
   local upgraded_series
