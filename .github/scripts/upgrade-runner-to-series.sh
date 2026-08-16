@@ -132,9 +132,49 @@ unhold_all_packages() {
   "${SUDO[@]}" apt-mark unhold $held >/dev/null || true
 }
 
+# Purging i386/multilib runtimes can leave /lib32 -> usr/lib32 dangling.
+# plucky base-files then refuses to unpack (Debian UsrMerge check).
+repair_usrmerge_compat_links() {
+  echo "==> repairing dangling usr-merge compat links"
+  local link dest target
+  local repaired=0
+  for link in /lib32 /lib64 /libx32; do
+    if [[ -L "$link" && ! -e "$link" ]]; then
+      dest="$(readlink "$link")"
+      if [[ "$dest" == /* ]]; then
+        target="$dest"
+      else
+        target="/$dest"
+      fi
+      echo "    $link -> $dest is dangling; creating $target"
+      "${SUDO[@]}" mkdir -p "$target"
+      repaired=1
+    fi
+  done
+  if [[ "$repaired" -eq 0 ]]; then
+    echo "    none"
+  fi
+}
+
+# Updates-only leftovers (gcc-14, mesa from noble-updates) are safe to drop.
+# Never purge essential runtimes — a failed suite pin is not a reason to
+# remove libgcc-s1 / libstdc++6.
+safe_to_purge_sru_leftover() {
+  local pkg="$1"
+  case "$pkg" in
+    libgcc-s1|libstdc++6|libc6|libc-bin|sed|sudo|bash|dash|coreutils|dpkg|apt)
+      return 1
+      ;;
+    mesa-*|libgl*|libgbm*|libdrm*|libllvm*|lib32*|gcc-14*|g++-14*|cpp-14*|gfortran-14*|libgcc-14-dev|libstdc++-14-dev|libgfortran-14-dev|packages-microsoft-prod|azure-vm-utils)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 # Noble-updates SRU versions contain "24.04" (e.g. 2.4.125-1ubuntu0.1~24.04.2).
 # Stock noble *release* packages do not. After pointing apt at noble release,
-# force those leftovers onto the suite version or purge them.
+# force those leftovers onto the suite version. Purge only updates-only extras.
 downgrade_sru_leftovers_to_base_release() {
   local pkg ver
   local -a leftover=()
@@ -147,17 +187,21 @@ downgrade_sru_leftovers_to_base_release() {
 
   if [[ ${#leftover[@]} -eq 0 ]]; then
     echo "    none"
+    repair_usrmerge_compat_links
     return 0
   fi
 
   echo "    leftover: ${leftover[*]}"
   local -a suite_pins=()
   local -a purge=()
+  local -a keep=()
   for pkg in "${leftover[@]}"; do
     if apt-cache show "$pkg" >/dev/null 2>&1; then
       suite_pins+=("${pkg}/${BASE_SERIES}")
-    else
+    elif safe_to_purge_sru_leftover "$pkg"; then
       purge+=("$pkg")
+    else
+      keep+=("$pkg")
     fi
   done
 
@@ -166,15 +210,26 @@ downgrade_sru_leftovers_to_base_release() {
     if ! apt_get install -y --allow-downgrades "${suite_pins[@]}"; then
       echo "    batch suite pin failed; retrying per package"
       for pkg in "${suite_pins[@]}"; do
-        apt_get install -y --allow-downgrades "$pkg" || purge+=("${pkg%/*}")
+        if ! apt_get install -y --allow-downgrades "$pkg"; then
+          pkg="${pkg%/*}"
+          if safe_to_purge_sru_leftover "$pkg"; then
+            purge+=("$pkg")
+          else
+            keep+=("$pkg")
+          fi
+        fi
       done
     fi
   fi
 
   if [[ ${#purge[@]} -gt 0 ]]; then
-    echo "    purging (no $BASE_SERIES release candidate): ${purge[*]}"
+    echo "    purging updates-only leftovers: ${purge[*]}"
     apt_get purge -y "${purge[@]}" || true
   fi
+  if [[ ${#keep[@]} -gt 0 ]]; then
+    echo "    leaving installed (not safe to purge): ${keep[*]}"
+  fi
+  repair_usrmerge_compat_links
 }
 
 assert_no_sru_canaries() {
@@ -280,6 +335,7 @@ main() {
   apt_get update -qq
   disable_needrestart
   purge_runner_extras
+  repair_usrmerge_compat_links
 
   echo "==> reset: stock $BASE_SERIES release (no -updates/-security), allow downgrades"
   write_ubuntu_archive_sources "$BASE_SERIES" release
@@ -293,7 +349,13 @@ main() {
   echo "==> upgrade: dist-upgrade to $TARGET_SERIES (archive.ubuntu.com, allow downgrades)"
   write_ubuntu_archive_sources "$TARGET_SERIES"
   apt_get update -qq
+  repair_usrmerge_compat_links
   apt_dist_upgrade
+  if [[ "$(host_series)" != "$TARGET_SERIES" ]]; then
+    echo "==> still on $(host_series); repairing usr-merge links and retrying $TARGET_SERIES upgrade"
+    repair_usrmerge_compat_links
+    apt_dist_upgrade
+  fi
   apt_get install -y --fix-broken --allow-downgrades || true
   apt_get autoremove -y --purge || true
   apt_get autoclean -y || true
