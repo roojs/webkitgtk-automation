@@ -39,11 +39,19 @@ EOF
 
 write_ubuntu_archive_sources() {
   local series="$1"
-  echo "==> writing Ubuntu archive sources for $series (archive.ubuntu.com only)"
+  local pockets="${2:-full}"
+  local suites
+  if [[ "$pockets" == "release" ]]; then
+    suites="$series"
+    echo "==> writing Ubuntu RELEASE sources for $series (no -updates/-security)"
+  else
+    suites="${series} ${series}-updates ${series}-security"
+    echo "==> writing Ubuntu archive sources for $series (archive.ubuntu.com only)"
+  fi
   "${SUDO[@]}" tee /etc/apt/sources.list.d/ubuntu.sources >/dev/null <<EOF
 Types: deb deb-src
 URIs: http://archive.ubuntu.com/ubuntu
-Suites: ${series} ${series}-updates ${series}-security
+Suites: ${suites}
 Components: main universe restricted multiverse
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 EOF

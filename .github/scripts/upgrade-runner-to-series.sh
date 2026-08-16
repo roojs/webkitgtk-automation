@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 # Upgrade a GitHub Actions runner from its base Ubuntu series to TARGET_SERIES.
 #
-# Used by build-questing.yml: ubuntu-24.04 (noble) → questing (25.10).
-# Two-pass dist-upgrade: first on the base release, then after rewriting apt sources.
+# Used by build-plucky.yml / build-questing.yml: ubuntu-24.04 (noble) → 25.04/25.10.
+#
+# GHA noble images ship noble-updates packages (mesa, libdrm) that are newer than
+# plucky. dist-upgrade will not replace those. So:
+#   1. Purge runner extras that fight a series upgrade
+#   2. Reset apt to stock BASE_SERIES *release* (no -updates/-security) and
+#      downgrade everything back to baseline 24.04
+#   3. Point apt at the target series and dist-upgrade forward
 #
 # Env:
-#   TARGET_SERIES   Required Ubuntu codename (e.g. questing)
+#   TARGET_SERIES   Required Ubuntu codename (e.g. plucky)
 #   BASE_SERIES     Source codename on the runner (default: host VERSION_CODENAME)
 #   APT_CACHE_DIR   Optional apt archive cache directory
 set -euo pipefail
@@ -86,12 +92,19 @@ strip_conflicting_runner_tools() {
   done
 }
 
-# Noble ships sosreport; plucky renamed it to sos and the packages fight over
-# /etc/sos/sos.conf. ubuntu-server then stays unpacked. Neither is needed to
-# compile webkit2gtk.
-purge_series_transition_packages() {
-  echo "==> purging series-transition packages (sosreport → sos, ubuntu-server)"
-  local -a pkgs=(sosreport sos ubuntu-server)
+# Packages that fight a series upgrade or are GHA extras we do not compile with.
+purge_runner_extras() {
+  echo "==> purging runner extras (not needed for webkit2gtk)"
+  local -a pkgs=(
+    sosreport sos ubuntu-server
+    docker-ce docker-ce-cli docker-ce-rootless-extras docker-buildx-plugin docker-compose-plugin
+    containerd.io moby-engine moby-cli moby-buildx moby-compose
+    kubectl
+    mysql-server mysql-server-8.0 mysql-client mysql-client-8.0 mysql-server-core-8.0 mysql-client-core-8.0
+    azure-cli
+    google-chrome-stable microsoft-edge-stable firefox
+    powershell
+  )
   local -a existing=()
   local pkg
   for pkg in "${pkgs[@]}"; do
@@ -108,46 +121,73 @@ purge_series_transition_packages() {
   apt_get autoremove -y --purge || true
 }
 
-package_candidate() {
-  local pkg="$1"
-  apt-cache policy "$pkg" 2>/dev/null | awk '/^[[:space:]]*Candidate:/ { print $2; exit }'
+unhold_all_packages() {
+  local held
+  held="$(apt-mark showhold 2>/dev/null || true)"
+  if [[ -z "$held" ]]; then
+    return 0
+  fi
+  echo "==> apt-mark unhold: ${held//$'\n'/ }"
+  # shellcheck disable=SC2086
+  "${SUDO[@]}" apt-mark unhold $held >/dev/null || true
 }
 
-downgrade_leftover_base_packages() {
-  local -a leftover=() skip=()
-  local pkg ver candidate
-  echo "==> downgrading leftover noble (24.04) packages to $TARGET_SERIES"
-  if command -v apt-mark >/dev/null 2>&1; then
-    "${SUDO[@]}" apt-mark unhold $(apt-mark showhold 2>/dev/null) >/dev/null 2>&1 || true
-  fi
+# Noble-updates SRU versions contain "24.04" (e.g. 2.4.125-1ubuntu0.1~24.04.2).
+# Stock noble *release* packages do not. After pointing apt at noble release,
+# force those leftovers onto the suite version or purge them.
+downgrade_sru_leftovers_to_base_release() {
+  local pkg ver
+  local -a leftover=()
+  echo "==> downgrading leftover *24.04* packages to stock $BASE_SERIES release"
   while read -r pkg ver; do
     [[ -n "$pkg" && -n "$ver" ]] || continue
     [[ "$ver" == *24.04* ]] || continue
-    candidate="$(package_candidate "$pkg")"
-    if [[ -z "$candidate" || "$candidate" == "(none)" ]]; then
-      skip+=("$pkg")
-      continue
-    fi
-    if [[ "$candidate" == "$ver" ]]; then
-      continue
-    fi
     leftover+=("$pkg")
   done < <(dpkg-query -W -f '${Package} ${Version}\n' 2>/dev/null || true)
 
-  if [[ ${#skip[@]} -gt 0 ]]; then
-    echo "    skip (no $TARGET_SERIES candidate): ${skip[*]}"
-  fi
   if [[ ${#leftover[@]} -eq 0 ]]; then
-    echo "    none to downgrade"
+    echo "    none"
     return 0
   fi
-  echo "    downgrading: ${leftover[*]}"
-  if ! apt_get install -y --allow-downgrades --no-remove "${leftover[@]}"; then
-    echo "    batch downgrade failed; retrying per package"
-    for pkg in "${leftover[@]}"; do
-      apt_get install -y --allow-downgrades --no-remove "$pkg" || true
-    done
+
+  echo "    leftover: ${leftover[*]}"
+  local -a suite_pins=()
+  local -a purge=()
+  for pkg in "${leftover[@]}"; do
+    if apt-cache show "$pkg" >/dev/null 2>&1; then
+      suite_pins+=("${pkg}/${BASE_SERIES}")
+    else
+      purge+=("$pkg")
+    fi
+  done
+
+  if [[ ${#suite_pins[@]} -gt 0 ]]; then
+    echo "    installing from ${BASE_SERIES}: ${suite_pins[*]}"
+    if ! apt_get install -y --allow-downgrades "${suite_pins[@]}"; then
+      echo "    batch suite pin failed; retrying per package"
+      for pkg in "${suite_pins[@]}"; do
+        apt_get install -y --allow-downgrades "$pkg" || purge+=("${pkg%/*}")
+      done
+    fi
   fi
+
+  if [[ ${#purge[@]} -gt 0 ]]; then
+    echo "    purging (no $BASE_SERIES release candidate): ${purge[*]}"
+    apt_get purge -y "${purge[@]}" || true
+  fi
+}
+
+assert_no_sru_canaries() {
+  local when="$1"
+  local pkg ver
+  for pkg in libdrm2 libgl1-mesa-dri mesa-libgallium; do
+    ver="$(dpkg-query -W -f '${Version}' "$pkg" 2>/dev/null || true)"
+    [[ -n "$ver" ]] || continue
+    if [[ "$ver" == *24.04* ]]; then
+      echo "error: $pkg still $ver after $when (build-dep will fail)" >&2
+      exit 1
+    fi
+  done
 }
 
 # shellcheck source=.github/scripts/normalize-runner-apt-sources.sh
@@ -233,33 +273,35 @@ main() {
   strip_conflicting_runner_tools
   strip_third_party_apt_sources
   remove_runner_apt_sources
-  write_ubuntu_archive_sources "$BASE_SERIES"
+  unhold_all_packages
 
-  echo "==> pass 1: update/upgrade/dist-upgrade on $BASE_SERIES (archive.ubuntu.com)"
+  write_ubuntu_archive_sources "$BASE_SERIES"
+  echo "==> cleanup: update and purge extras on $BASE_SERIES"
   apt_get update -qq
   disable_needrestart
-  purge_series_transition_packages
-  apt_get upgrade -y
-  apt_dist_upgrade
+  purge_runner_extras
 
-  write_ubuntu_archive_sources "$TARGET_SERIES"
-
-  echo "==> pass 2: dist-upgrade to $TARGET_SERIES (archive.ubuntu.com, allow downgrades)"
+  echo "==> reset: stock $BASE_SERIES release (no -updates/-security), allow downgrades"
+  write_ubuntu_archive_sources "$BASE_SERIES" release
   apt_get update -qq
-  purge_series_transition_packages
   apt_dist_upgrade
-  downgrade_leftover_base_packages
+  apt_get install -y --fix-broken --allow-downgrades || true
+  downgrade_sru_leftovers_to_base_release
+  apt_get autoremove -y --purge || true
+  assert_no_sru_canaries "stock $BASE_SERIES release reset"
 
-  local leftover_drm
-  leftover_drm="$(dpkg-query -W -f '${Version}' libdrm2 2>/dev/null || true)"
-  if [[ "$leftover_drm" == *24.04* ]]; then
-    echo "error: libdrm2 still $leftover_drm after downgrade (plucky build-dep will fail)" >&2
-    exit 1
-  fi
+  echo "==> upgrade: dist-upgrade to $TARGET_SERIES (archive.ubuntu.com, allow downgrades)"
+  write_ubuntu_archive_sources "$TARGET_SERIES"
+  apt_get update -qq
+  apt_dist_upgrade
+  apt_get install -y --fix-broken --allow-downgrades || true
+  apt_get autoremove -y --purge || true
+  apt_get autoclean -y || true
+  assert_no_sru_canaries "$TARGET_SERIES upgrade"
 
   local upgraded_series
   upgraded_series="$(host_series)"
-  echo "==> host series after pass 2: ${upgraded_series:-unknown}"
+  echo "==> host series after upgrade: ${upgraded_series:-unknown}"
   if [[ "$upgraded_series" != "$TARGET_SERIES" ]]; then
     echo "error: expected VERSION_CODENAME=$TARGET_SERIES after dist-upgrade, got ${upgraded_series:-<empty>}" >&2
     exit 1
