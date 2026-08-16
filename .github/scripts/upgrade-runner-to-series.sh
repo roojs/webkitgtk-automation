@@ -108,23 +108,46 @@ purge_series_transition_packages() {
   apt_get autoremove -y --purge || true
 }
 
+package_candidate() {
+  local pkg="$1"
+  apt-cache policy "$pkg" 2>/dev/null | awk '/^[[:space:]]*Candidate:/ { print $2; exit }'
+}
+
 downgrade_leftover_base_packages() {
-  local -a leftover=()
-  local pkg ver
+  local -a leftover=() skip=()
+  local pkg ver candidate
   echo "==> downgrading leftover noble (24.04) packages to $TARGET_SERIES"
+  if command -v apt-mark >/dev/null 2>&1; then
+    "${SUDO[@]}" apt-mark unhold $(apt-mark showhold 2>/dev/null) >/dev/null 2>&1 || true
+  fi
   while read -r pkg ver; do
     [[ -n "$pkg" && -n "$ver" ]] || continue
-    if [[ "$ver" == *24.04* ]]; then
-      leftover+=("$pkg")
+    [[ "$ver" == *24.04* ]] || continue
+    candidate="$(package_candidate "$pkg")"
+    if [[ -z "$candidate" || "$candidate" == "(none)" ]]; then
+      skip+=("$pkg")
+      continue
     fi
+    if [[ "$candidate" == "$ver" ]]; then
+      continue
+    fi
+    leftover+=("$pkg")
   done < <(dpkg-query -W -f '${Package} ${Version}\n' 2>/dev/null || true)
 
+  if [[ ${#skip[@]} -gt 0 ]]; then
+    echo "    skip (no $TARGET_SERIES candidate): ${skip[*]}"
+  fi
   if [[ ${#leftover[@]} -eq 0 ]]; then
-    echo "    none"
+    echo "    none to downgrade"
     return 0
   fi
-  echo "    ${leftover[*]}"
-  apt_get install -y --allow-downgrades "${leftover[@]}" || true
+  echo "    downgrading: ${leftover[*]}"
+  if ! apt_get install -y --allow-downgrades --no-remove "${leftover[@]}"; then
+    echo "    batch downgrade failed; retrying per package"
+    for pkg in "${leftover[@]}"; do
+      apt_get install -y --allow-downgrades --no-remove "$pkg" || true
+    done
+  fi
 }
 
 # shellcheck source=.github/scripts/normalize-runner-apt-sources.sh
@@ -225,7 +248,14 @@ main() {
   apt_get update -qq
   purge_series_transition_packages
   apt_dist_upgrade
-  downgrade_leftover_base_packages "$BASE_SERIES"
+  downgrade_leftover_base_packages
+
+  local leftover_drm
+  leftover_drm="$(dpkg-query -W -f '${Version}' libdrm2 2>/dev/null || true)"
+  if [[ "$leftover_drm" == *24.04* ]]; then
+    echo "error: libdrm2 still $leftover_drm after downgrade (plucky build-dep will fail)" >&2
+    exit 1
+  fi
 
   local upgraded_series
   upgraded_series="$(host_series)"
