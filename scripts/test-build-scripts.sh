@@ -80,9 +80,9 @@ test_compile_cache_key_pipefail() {
   (
     set -euo pipefail
     key="$(read_compile_cache_key "$COMPILE_CACHE_KEY_FILE")"
-    [[ "$key" == "v5" ]] || exit 1
-  ) || fail "expected compile cache key v5 under pipefail"
-  pass "key=v5"
+    [[ "$key" == "v6" ]] || exit 1
+  ) || fail "expected compile cache key v6 under pipefail"
+  pass "key=v6"
 
   echo "==> compile-cache-key regression (broken tr|grep pipeline must fail)"
   if (
@@ -122,11 +122,11 @@ test_marker_matching() {
   cat >"$marker" <<EOF
 SERIES=resolute
 SUFFIX=+webkitgtk1
-COMPILE_CACHE_KEY=v5
+COMPILE_CACHE_KEY=v6
 PATCH_SHA256=abc
 EOF
-  marker_matches "$marker" resolute '+webkitgtk1' v5 || fail "new marker should match"
-  marker_matches "$marker" resolute '+webkitgtk1' v2 && fail "wrong compile key should not match"
+  marker_matches "$marker" resolute '+webkitgtk1' v6 || fail "new marker should match"
+  marker_matches "$marker" resolute '+webkitgtk1' v5 && fail "wrong compile key should not match"
   pass "new marker"
 
   cat >"$marker" <<EOF
@@ -134,7 +134,7 @@ SERIES=resolute
 SUFFIX=+webkitgtk1
 PATCH_SHA256=abc
 EOF
-  marker_matches "$marker" resolute '+webkitgtk1' v5 || fail "legacy marker should match"
+  marker_matches "$marker" resolute '+webkitgtk1' v6 || fail "legacy marker should match"
   pass "legacy marker"
   trap - RETURN
 }
@@ -295,7 +295,7 @@ test_work_cache_roundtrip() {
   cat >"$src/$MARKER_NAME" <<EOF
 SERIES=resolute
 SUFFIX=+webkitgtk1
-COMPILE_CACHE_KEY=v5
+COMPILE_CACHE_KEY=v6
 PATCH_SHA256=dummy
 EOF
 

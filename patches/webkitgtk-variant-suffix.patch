@@ -1,16 +1,12 @@
 --- a/Source/cmake/OptionsGTK.cmake
 +++ b/Source/cmake/OptionsGTK.cmake
-@@ -211,6 +211,10 @@
- EXPOSE_STRING_VARIABLE_TO_BUILD(WEBKITGTK_VARIANT_SUFFIX)
- set(WEBKITGTK_LIBRARY_QUALIFIER "${WEBKITGTK_API_VERSION}${WEBKITGTK_VARIANT_SUFFIX}")
+@@ -209,2 +209,6 @@
+ EXPOSE_STRING_VARIABLE_TO_BUILD(WEBKITGTK_API_VERSION)
  
 +set(WEBKITGTK_VARIANT_SUFFIX "" CACHE STRING "Optional parallel-install library suffix (e.g. -webdriver)")
 +EXPOSE_STRING_VARIABLE_TO_BUILD(WEBKITGTK_VARIANT_SUFFIX)
 +set(WEBKITGTK_LIBRARY_QUALIFIER "${WEBKITGTK_API_VERSION}${WEBKITGTK_VARIANT_SUFFIX}")
 +
- if (WEBKITGTK_API_VERSION VERSION_EQUAL "4.0")
-     CALCULATE_LIBRARY_VERSIONS_FROM_LIBTOOL_TRIPLE(WEBKIT 109 6 72)
-     CALCULATE_LIBRARY_VERSIONS_FROM_LIBTOOL_TRIPLE(JAVASCRIPTCORE 45 4 27)
 --- a/Source/WebKit/PlatformGTK.cmake
 +++ b/Source/WebKit/PlatformGTK.cmake
 @@ -10,7 +10,7 @@
@@ -49,6 +45,9 @@
 +                DESTINATION "${LIB_INSTALL_DIR}/pkgconfig"
 +        )
 +    endif ()
- else ()
-     install(FILES "${CMAKE_BINARY_DIR}/Source/WebKit/webkit2gtk-${WEBKITGTK_API_VERSION}.pc"
-                   "${CMAKE_BINARY_DIR}/Source/WebKit/webkit2gtk-web-extension-${WEBKITGTK_API_VERSION}.pc"
+else ()
+    install(FILES "${CMAKE_BINARY_DIR}/Source/WebKit/webkit2gtk-${WEBKITGTK_API_VERSION}.pc"
+                  "${CMAKE_BINARY_DIR}/Source/WebKit/webkit2gtk-web-extension-${WEBKITGTK_API_VERSION}.pc"
+            DESTINATION "${LIB_INSTALL_DIR}/pkgconfig"
+    )
+endif ()
