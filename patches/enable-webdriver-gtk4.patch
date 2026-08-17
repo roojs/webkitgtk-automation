@@ -66,7 +66,7 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
 +WEBKIT_DH_RENAME_WEBDRIVER = sed -e 's/libwebkitgtk-6.0-4/libwebkitgtk-6.0-webdriver4/g' \
 +			    -e 's/libwebkitgtk-6.0-dev/libwebkitgtk-6.0-webdriver-dev/g' \
 +			    -e 's/libwebkitgtk-6.0\.so/libwebkitgtk-6.0-webdriver.so/g' \
-+			    -e 's/webkitgtk-6\.0\//webkitgtk-6.0-webdriver/g'
++			    -e 's/webkitgtk-6\.0\//webkitgtk-6.0-webdriver\//g'
 +
  %:
  	dh $@ --with gir --buildsystem=cmake+ninja $(EXTRA_DH_ARGUMENTS)
