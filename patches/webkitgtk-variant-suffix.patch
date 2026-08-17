@@ -45,9 +45,9 @@
 +                DESTINATION "${LIB_INSTALL_DIR}/pkgconfig"
 +        )
 +    endif ()
-else ()
-    install(FILES "${CMAKE_BINARY_DIR}/Source/WebKit/webkit2gtk-${WEBKITGTK_API_VERSION}.pc"
-                  "${CMAKE_BINARY_DIR}/Source/WebKit/webkit2gtk-web-extension-${WEBKITGTK_API_VERSION}.pc"
-            DESTINATION "${LIB_INSTALL_DIR}/pkgconfig"
-    )
-endif ()
+ else ()
+     install(FILES "${CMAKE_BINARY_DIR}/Source/WebKit/webkit2gtk-${WEBKITGTK_API_VERSION}.pc"
+                   "${CMAKE_BINARY_DIR}/Source/WebKit/webkit2gtk-web-extension-${WEBKITGTK_API_VERSION}.pc"
+             DESTINATION "${LIB_INSTALL_DIR}/pkgconfig"
+     )
+ endif ()
