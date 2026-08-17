@@ -11,7 +11,7 @@ on:
       suffix:
         description: Debian version suffix appended to the Ubuntu package version
         required: true
-        default: "+webkitgtk1"
+        default: "+webdriver1"
         type: string
       clean:
         description: Wipe work tree before building (ignore restored work cache)
@@ -43,7 +43,7 @@ env:
   DEBIAN_FRONTEND: noninteractive
   NEEDRESTART_MODE: a
   NEEDRESTART_SUSPEND: "1"
-  SUFFIX: ${{ github.event.inputs.suffix || '+webkitgtk1' }}
+  SUFFIX: ${{ github.event.inputs.suffix || '+webdriver1' }}
   CLEAN: ${{ github.event.inputs.clean == 'true' && '1' || '0' }}
   CLEAN_CACHE: ${{ github.event.inputs.clean_cache == 'true' && '1' || '0' }}
   REFRESH_APT: ${{ github.event.inputs.refresh_apt_cache == 'true' && '1' || '0' }}
@@ -208,21 +208,23 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          DEBS=(dist/libwebkitgtk-6.0-4_*.deb)
+          DEBS=(dist/libwebkitgtk-6.0-webdriver4_*.deb)
           if [[ ${#DEBS[@]} -eq 0 ]]; then
             echo "error: no runtime .deb found in dist/" >&2
             exit 1
           fi
           VERSION="$(dpkg-deb -f "${DEBS[0]}" Version)"
-          NOTES="Rebuilt Ubuntu webkit2gtk (${SERIES}) with ENABLE_WEBDRIVER for GTK4/libwebkitgtk-6.0 (WebKit #318171).
+          NOTES="Parallel-install libwebkitgtk-6.0-webdriver for Ubuntu ${SERIES} (ENABLE_WEBDRIVER, WebKit #318171).
 
           Package version: \`${VERSION}\`
 
-          Install alongside system webkit2gtk-driver / webkitgtk-webdriver:
+          Installs **alongside** system \`libwebkitgtk-6.0-4\`. Uses system \`libjavascriptcoregtk-6.0-1\`.
 
           \`\`\`bash
-          sudo apt install ./libwebkitgtk-6.0-4_*.deb
+          sudo apt install ./libwebkitgtk-6.0-webdriver4_*.deb ./libwebkitgtk-6.0-webdriver-dev_*.deb
           \`\`\`
+
+          Meson: \`dependency('webkitgtk-6.0-webdriver')\` (requires thin -dev pc + system \`libwebkitgtk-6.0-dev\` for headers/vapi).
           "
 
           if [[ -n "${TRIGGER_TAG}" ]]; then
