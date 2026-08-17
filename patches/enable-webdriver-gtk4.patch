@@ -1,5 +1,5 @@
---- a/debian/rules	2026-08-16 23:08:52.045857657 +0000
-+++ b/debian/rules	2026-08-16 23:10:02.838081169 +0000
+--- a/debian/rules	2026-08-17 04:07:42.227429285 +0000
+b/debian/rules	2026-08-17 04:07:42.303429475 +0000
 @@ -5,14 +5,26 @@
  include /usr/share/dpkg/architecture.mk
  include /usr/share/dpkg/buildflags.mk
@@ -85,10 +85,20 @@
  	sed -i '$${/^$$/d}' debian/control # Remove last empty line
  
  override_dh_gencontrol:
-@@ -247,33 +276,55 @@
- 
- override_dh_auto_configure:
- 	echo debian/clean > debian/clean
+@@ -250,30 +279,55 @@
+ 	if [ "$(ENABLE_GTK4)" = "YES" ]; then \
+ 		for src in $(WEBKIT_DH_FILES); do \
+ 			dst=`echo $$src | $(WEBKIT_DH_RENAME_GTK4)` ; \
+-			$(WEBKIT_DH_CONVERT_GTK4) debian/$$src > debian/$$dst ; \
+-			echo debian/$$dst >> debian/clean ; \
++			wd=`echo $$dst | $(WEBKIT_DH_RENAME_WEBDRIVER_NAMES)` ; \
++			case $$src in *-dev.install|gir*.install|*.docs) ;; \
++			*) \
++				$(WEBKIT_DH_CONVERT_GTK4) debian/$$src | $(WEBKIT_DH_RENAME_WEBDRIVER) > debian/$$wd ; \
++				echo debian/$$wd >> debian/clean ; \
++			esac ; \
+ 		done ; \
+ 	fi
 +	@{ \
 +		echo 'prefix=/usr'; \
 +		echo 'libdir=$${prefix}/lib/$(DEB_HOST_MULTIARCH)'; \
@@ -103,16 +113,6 @@
 +	} > debian/webkitgtk-6.0-webdriver.pc
 +	echo 'debian/webkitgtk-6.0-webdriver.pc usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/' > debian/libwebkitgtk-6.0-webdriver-dev.install
 +	echo debian/webkitgtk-6.0-webdriver.pc >> debian/clean
- 	if [ "$(ENABLE_GTK4)" = "YES" ]; then \
- 		for src in $(WEBKIT_DH_FILES); do \
- 			dst=`echo $$src | $(WEBKIT_DH_RENAME_GTK4)` ; \
--			$(WEBKIT_DH_CONVERT_GTK4) debian/$$src > debian/$$dst ; \
--			echo debian/$$dst >> debian/clean ; \
-+			wd=`echo $$dst | $(WEBKIT_DH_RENAME_WEBDRIVER_NAMES)` ; \
-+			$(WEBKIT_DH_CONVERT_GTK4) debian/$$src | $(WEBKIT_DH_RENAME_WEBDRIVER) > debian/$$wd ; \
-+			echo debian/$$wd >> debian/clean ; \
- 		done ; \
- 	fi
  	$(GTK3_BUILD) dh_auto_configure -Bbuild-gtk3 -- \
  		-DENABLE_DOCUMENTATION=OFF -DUSE_GTK4=OFF \
  		$(EXTRA_CMAKE_ARGUMENTS)
@@ -145,7 +145,7 @@
  
  # Create a dummy doc directory in case the "nodoc" build option is set.
  override_dh_install-indep:
-@@ -287,8 +338,7 @@
+@@ -287,8 +341,7 @@
  override_dh_makeshlibs:
  	$(GTK3_BUILD) dh_makeshlibs -plibwebkit2gtk-4.1-0 -Xinjected-bundle
  	$(GTK3_BUILD) dh_makeshlibs -plibjavascriptcoregtk-4.1-0 -VNone

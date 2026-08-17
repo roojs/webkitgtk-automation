@@ -1,5 +1,5 @@
---- a/debian/rules
-+++ b/debian/rules
+--- a/debian/rules	2026-08-17 04:07:25.967384975 +0000
+b/debian/rules	2026-08-17 04:07:26.039385186 +0000
 @@ -6,19 +6,29 @@
  include /usr/share/dpkg/buildflags.mk
  
@@ -91,10 +91,20 @@
  	sed -i '$${/^$$/d}' debian/control # Remove last empty line
  
  override_dh_gencontrol:
-@@ -299,14 +327,29 @@
- 
- override_dh_auto_configure:
- 	echo debian/clean > debian/clean
+@@ -305,10 +333,28 @@
+ 			$(WEBKIT_DH_RENAME_SOUP3) debian/$$src > debian/$$dst ; \
+ 			echo debian/$$dst >> debian/clean ; \
+ 			dst=`echo $$src | $(WEBKIT_DH_RENAME_GTK4)` ; \
+-			$(WEBKIT_DH_RENAME_GTK4) debian/$$src > debian/$$dst ; \
+-			echo debian/$$dst >> debian/clean ; \
++			wd=`echo $$dst | $(WEBKIT_DH_RENAME_WEBDRIVER_NAMES)` ; \
++			case $$src in *-dev.install|gir*.install|*.docs) ;; \
++			*) \
++				$(WEBKIT_DH_RENAME_GTK4) debian/$$src | $(WEBKIT_DH_RENAME_WEBDRIVER) > debian/$$wd ; \
++				echo debian/$$wd >> debian/clean ; \
++			esac ; \
+ 		done ; \
+ 	fi
 +	@{ \
 +		echo 'prefix=/usr'; \
 +		echo 'libdir=$${prefix}/lib/$(DEB_HOST_MULTIARCH)'; \
@@ -109,21 +119,10 @@
 +	} > debian/webkitgtk-6.0-webdriver.pc
 +	echo 'debian/webkitgtk-6.0-webdriver.pc usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/' > debian/libwebkitgtk-6.0-webdriver-dev.install
 +	echo debian/webkitgtk-6.0-webdriver.pc >> debian/clean
- 	if [ "$(ENABLE_SOUP3)" = "YES" -o "$(ENABLE_GTK4)" = "YES" ]; then \
- 		for src in $(WEBKIT_DH_FILES); do \
- 			dst=`echo $$src | $(WEBKIT_DH_RENAME_SOUP3)` ; \
- 			$(WEBKIT_DH_RENAME_SOUP3) debian/$$src > debian/$$dst ; \
- 			echo debian/$$dst >> debian/clean ; \
- 			dst=`echo $$src | $(WEBKIT_DH_RENAME_GTK4)` ; \
--			$(WEBKIT_DH_RENAME_GTK4) debian/$$src > debian/$$dst ; \
--			echo debian/$$dst >> debian/clean ; \
-+			wd=`echo $$dst | $(WEBKIT_DH_RENAME_WEBDRIVER_NAMES)` ; \
-+			$(WEBKIT_DH_RENAME_WEBDRIVER) debian/$$src > debian/$$wd ; \
-+			echo debian/$$wd >> debian/clean ; \
- 		done ; \
- 	fi
  	if [ "$(USE_OLD_PKG_NAMES)" = "YES" ]; then \
-@@ -332,19 +375,24 @@
+ 		for src in $(WEBKIT_DOC_DH_FILES); do \
+ 			dst=`echo $$src | $(WEBKIT_DH_RENAME_DOC)` ; \
+@@ -332,19 +378,24 @@
  		$(ENABLE_WEBDRIVER_SOUP3) -DENABLE_DOCUMENTATION=OFF
  	$(GTK4_BUILD) WK_USE_CCACHE=NO dh_auto_configure -Bbuild-gtk4 -- \
  		$(EXTRA_CMAKE_ARGUMENTS) \
@@ -150,7 +149,7 @@
  
  override_dh_auto_clean: debian/control
  	$(SOUP2_BUILD) dh_auto_clean -Bbuild-soup2
-@@ -352,7 +400,8 @@
+@@ -352,7 +403,8 @@
  	$(GTK4_BUILD)  dh_auto_clean -Bbuild-gtk4
  	find Source Tools -type f -name "*.pyc" -exec rm {} \;
  	find Source Tools -depth -type d -name __pycache__ -exec rmdir {} \;
@@ -160,7 +159,7 @@
  
  # Create a dummy doc directory in case the "nodoc" build option is set.
  override_dh_install-indep:
-@@ -368,8 +417,7 @@
+@@ -368,8 +420,7 @@
  	$(SOUP2_BUILD) dh_makeshlibs -plibjavascriptcoregtk-4.0-18 -VNone
  	$(SOUP3_BUILD) dh_makeshlibs -plibwebkit2gtk-4.1-0 -Xinjected-bundle
  	$(SOUP3_BUILD) dh_makeshlibs -plibjavascriptcoregtk-4.1-0 -VNone
