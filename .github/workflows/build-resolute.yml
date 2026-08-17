@@ -1,7 +1,7 @@
-name: Build libwebkitgtk-6.0 with WebDriver
+name: Build libwebkitgtk-6.0 (26.04 resolute)
 
-# Fire-and-forget: push a build-resolute-* tag, go away; .debs land on that tag's Release.
-# Manual runs still work via workflow_dispatch.
+# Native resolute build on ubuntu-26.04.
+# Trigger: build-resolute-* tags or workflow_dispatch.
 on:
   push:
     tags:
@@ -11,7 +11,7 @@ on:
       suffix:
         description: Debian version suffix appended to the Ubuntu package version
         required: true
-        default: "+webkitgtk1"
+        default: "+webdriver1"
         type: string
       clean:
         description: Wipe work tree before building (ignore restored work cache)
@@ -37,12 +37,12 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  APT_CACHE_DIR: .ci-cache/apt
+  APT_CACHE_DIR: .ci-cache/apt-resolute
   WORK_CACHE_DIR: .ci-cache/work
   # Native build on the runner image — must match runs-on.
   SERIES: resolute
   # workflow_dispatch inputs are empty on tag pushes — fall back to defaults.
-  SUFFIX: ${{ github.event.inputs.suffix || '+webkitgtk1' }}
+  SUFFIX: ${{ github.event.inputs.suffix || '+webdriver1' }}
   CLEAN: ${{ github.event.inputs.clean == 'true' && '1' || '0' }}
   CLEAN_CACHE: ${{ github.event.inputs.clean_cache == 'true' && '1' || '0' }}
   REFRESH_APT: ${{ github.event.inputs.refresh_apt_cache == 'true' && '1' || '0' }}
@@ -88,7 +88,7 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: ${{ env.APT_CACHE_DIR }}
-          key: apt-webkitgtk-v1-${{ env.REFRESH_APT == '1' && github.run_id || 'stable' }}-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/setup-ci-build-env.sh', '.github/scripts/normalize-runner-apt-sources.sh', 'build.sh') }}
+          key: apt-webkitgtk-v1-${{ env.REFRESH_APT == '1' && github.run_id || 'stable' }}-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build-resolute.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/setup-ci-build-env.sh', '.github/scripts/normalize-runner-apt-sources.sh', 'build.sh') }}
           restore-keys: |
             apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-
             apt-webkitgtk-v1-stable-${{ env.SERIES }}-
@@ -183,7 +183,7 @@ jobs:
         uses: actions/cache/save@v5
         with:
           path: ${{ env.APT_CACHE_DIR }}
-          key: apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/setup-ci-build-env.sh', '.github/scripts/normalize-runner-apt-sources.sh', 'build.sh') }}
+          key: apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build-resolute.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/setup-ci-build-env.sh', '.github/scripts/normalize-runner-apt-sources.sh', 'build.sh') }}
 
       - name: Save ccache
         if: ${{ always() && (steps.build.outcome == 'success' || steps.build.outcome == 'failure' || steps.build.outcome == 'cancelled') }}
@@ -209,21 +209,23 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          DEBS=(dist/libwebkitgtk-6.0-4_*.deb)
+          DEBS=(dist/libwebkitgtk-6.0-webdriver4_*.deb)
           if [[ ${#DEBS[@]} -eq 0 ]]; then
             echo "error: no runtime .deb found in dist/" >&2
             exit 1
           fi
           VERSION="$(dpkg-deb -f "${DEBS[0]}" Version)"
-          NOTES="Rebuilt Ubuntu webkit2gtk (${SERIES}) with ENABLE_WEBDRIVER for GTK4/libwebkitgtk-6.0 (WebKit #318171).
+          NOTES="Parallel-install libwebkitgtk-6.0-webdriver for Ubuntu ${SERIES} (ENABLE_WEBDRIVER, WebKit #318171).
 
           Package version: \`${VERSION}\`
 
-          Install alongside system webkit2gtk-driver / webkitgtk-webdriver:
+          Installs **alongside** system \`libwebkitgtk-6.0-4\`. Uses system \`libjavascriptcoregtk-6.0-1\`.
 
           \`\`\`bash
-          sudo apt install ./libwebkitgtk-6.0-4_*.deb
+          sudo apt install ./libwebkitgtk-6.0-webdriver4_*.deb ./libwebkitgtk-6.0-webdriver-dev_*.deb
           \`\`\`
+
+          Meson: \`dependency('webkitgtk-6.0-webdriver')\` (requires thin -dev pc + system \`libwebkitgtk-6.0-dev\` for headers/vapi).
           "
 
           if [[ -n "${TRIGGER_TAG}" ]]; then

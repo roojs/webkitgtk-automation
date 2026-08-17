@@ -144,9 +144,9 @@ git tag build-resolute-$(date +%Y%m%d)
 git push origin build-resolute-$(date +%Y%m%d)
 ```
 
-Workflow: **Build libwebkitgtk-6.0 with WebDriver** (`.github/workflows/build.yml`).
+Workflow: **Build libwebkitgtk-6.0 (26.04 resolute)** (`.github/workflows/build-resolute.yml`).
 
-Native on `ubuntu-26.04`. CI strips GHA preinstalls (CMake 4.4, browsers, SDKs), rewrites apt to `archive.ubuntu.com`, installs archive cmake and holds it, then builds.
+Native on `ubuntu-26.04`. Apt cache under `.ci-cache/apt-resolute`. CI strips GHA preinstalls (CMake 4.4, browsers, SDKs), rewrites apt to `archive.ubuntu.com`, installs archive cmake and holds it, then builds.
 
 When a workflow finishes, the `.deb`s are on that tag's **Release**.
 
@@ -192,7 +192,7 @@ Manual `workflow_dispatch` inputs:
 | `.github/scripts/upgrade-runner-to-series.sh` | CI: dist-upgrade runner to target series (plucky/questing) |
 | `.github/workflows/build-plucky.yml` | Plucky build (noble runner → 25.04 upgrade → Release) |
 | `.github/workflows/build-questing.yml` | Questing build (noble runner → 25.10 upgrade → Release) |
-| `.github/workflows/build.yml` | Resolute build (26.04 native → Release) |
+| `.github/workflows/build-resolute.yml` | Resolute build (26.04 native → Release) |
 | `cache/ccache` | Persistent compiler cache (gitignored) |
 | `.ci-cache/apt` | Apt `.deb` archives for CI (gitignored) |
 | `.ci-cache/work` | Packed work tree for resume (gitignored) |
