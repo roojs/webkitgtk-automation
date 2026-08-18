@@ -85,7 +85,7 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
  	sed -i '$${/^$$/d}' debian/control # Remove last empty line
  
  override_dh_gencontrol:
-@@ -250,30 +279,55 @@
+@@ -250,30 +279,61 @@
  	if [ "$(ENABLE_GTK4)" = "YES" ]; then \
  		for src in $(WEBKIT_DH_FILES); do \
  			dst=`echo $$src | $(WEBKIT_DH_RENAME_GTK4)` ; \
@@ -108,7 +108,7 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
 +		echo 'Description: WebKitGTK 6.0 with WebDriver interactions (parallel install)'; \
 +		echo 'Version: $(shell dpkg-parsechangelog -S Version)'; \
 +		echo 'Requires: gtk4, libsoup-3.0, javascriptcoregtk-6.0'; \
-+		echo 'Libs: -L$${libdir} -lwebkitgtk-6.0-webdriver'; \
++		echo 'Libs: -L$${libdir} -l:libwebkitgtk-6.0-webdriver.so.4'; \
 +		echo 'Cflags: -I$${includedir}/webkitgtk-6.0'; \
 +	} > debian/webkitgtk-6.0-webdriver.pc
 +	echo 'debian/webkitgtk-6.0-webdriver.pc usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/' > debian/libwebkitgtk-6.0-webdriver-dev.install
@@ -132,9 +132,15 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
  override_dh_auto_install:
  	$(GTK3_BUILD) dh_auto_install -Bbuild-gtk3
  	$(GTK4_BUILD) dh_auto_install -Bbuild-gtk4
-+	find debian/tmp -type f \( -name 'libjavascriptcoregtk-6.0.so*' -o -name 'javascriptcoregtk-6.0.pc' -o -name 'webkitgtk-6.0.pc' -o -name 'webkitgtk-web-process-extension-6.0.pc' \) -delete
-+	find debian/tmp -path '*/girepository-1.0/*JavaScriptCore*6.0*' -delete
-+	find debian/tmp -path '*/girepository-1.0/*WebKit*6.0*' -delete
++	find debian/tmp \( -type f -o -type l \) \( \
++		-name 'libjavascriptcoregtk-6.0.so' -o -name 'libjavascriptcoregtk-6.0.so.*' \
++		-o -name 'libwebkitgtk-6.0-webdriver.so' \
++		-o -name 'javascriptcoregtk-6.0.pc' -o -name 'webkitgtk-6.0.pc' \
++		-o -name 'webkitgtk-web-process-extension-6.0.pc' \) -delete
++	find debian/tmp -path '*/gir-1.0/*JavaScriptCore*6.0*' -delete
++	find debian/tmp -path '*/gir-1.0/*WebKit*6.0*' -delete
++	rm -rf debian/tmp/usr/include/webkitgtk-6.0
++	rm -rf debian/tmp/usr/lib/*/webkitgtk-6.0-webdriver/jsc
  
  override_dh_auto_clean: debian/control
  	$(GTK3_BUILD) dh_auto_clean -Bbuild-gtk3
