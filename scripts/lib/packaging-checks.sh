@@ -31,6 +31,8 @@ assert_patched_rules_markers() {
     || { echo "error: locale must be filtered when generating webdriver4.install" >&2; return 1; }
   grep -q 'gir-1.0' "$rules" \
     || { echo "error: GIR cleanup path must target gir-1.0" >&2; return 1; }
+  grep -q 'girepository-1.0' "$rules" \
+    || { echo "error: typelib cleanup path must target girepository-1.0" >&2; return 1; }
   grep -q 'fuse-ld=gold' "$rules" \
     || { echo "error: gold linker marker missing" >&2; return 1; }
   ! grep -q 'reduce-memory-overheads' "$rules" \

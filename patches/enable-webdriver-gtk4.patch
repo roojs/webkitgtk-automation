@@ -85,7 +85,7 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
  	sed -i '$${/^$$/d}' debian/control # Remove last empty line
  
  override_dh_gencontrol:
-@@ -250,30 +281,65 @@
+@@ -250,30 +281,67 @@
  	if [ "$(ENABLE_GTK4)" = "YES" ]; then \
  		for src in $(WEBKIT_DH_FILES); do \
  			dst=`echo $$src | $(WEBKIT_DH_RENAME_GTK4)` ; \
@@ -139,6 +139,8 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
 +		-o -name 'webkitgtk-web-process-extension-6.0.pc' \) -delete
 +	find debian/tmp -path '*/gir-1.0/*JavaScriptCore*6.0*' -delete
 +	find debian/tmp -path '*/gir-1.0/*WebKit*6.0*' -delete
++	find debian/tmp -path '*/girepository-1.0/*JavaScriptCore*6.0*' -delete
++	find debian/tmp -path '*/girepository-1.0/*WebKit*6.0*' -delete
 +	rm -rf debian/tmp/usr/include/webkitgtk-6.0
 +	rm -rf debian/tmp/usr/lib/*/webkitgtk-6.0-webdriver/jsc
 +	find debian/tmp -path '*/LC_MESSAGES/WebKitGTK-6.0.mo' -delete

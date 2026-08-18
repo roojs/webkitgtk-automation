@@ -98,6 +98,11 @@ populate_debian_tmp_stubs() {
   : >"$src/debian/tmp/usr/include/webkitgtk-6.0/webkit.h"
   mkdir -p "$src/debian/tmp/usr/share/gir-1.0"
   : >"$src/debian/tmp/usr/share/gir-1.0/WebKit-6.0.gir"
+  local multiarch="${DEB_HOST_MULTIARCH:-$(dpkg-architecture -qDEB_HOST_MULTI_ARCH)}"
+  mkdir -p "$src/debian/tmp/usr/lib/$multiarch/girepository-1.0"
+  : >"$src/debian/tmp/usr/lib/$multiarch/girepository-1.0/JavaScriptCore-6.0.typelib"
+  : >"$src/debian/tmp/usr/lib/$multiarch/girepository-1.0/WebKit-6.0.typelib"
+  : >"$src/debian/tmp/usr/lib/$multiarch/girepository-1.0/WebKitWebProcessExtension-6.0.typelib"
 }
 
 run_override_dh_auto_install_cleanup() {
@@ -110,6 +115,8 @@ run_override_dh_auto_install_cleanup() {
     -o -name 'webkitgtk-web-process-extension-6.0.pc' \) -delete
   find debian/tmp -path '*/gir-1.0/*JavaScriptCore*6.0*' -delete
   find debian/tmp -path '*/gir-1.0/*WebKit*6.0*' -delete
+  find debian/tmp -path '*/girepository-1.0/*JavaScriptCore*6.0*' -delete
+  find debian/tmp -path '*/girepository-1.0/*WebKit*6.0*' -delete
   rm -rf debian/tmp/usr/include/webkitgtk-6.0
   rm -rf debian/tmp/usr/lib/*/webkitgtk-6.0-webdriver/jsc
   find debian/tmp -path '*/LC_MESSAGES/WebKitGTK-6.0.mo' -delete

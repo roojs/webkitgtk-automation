@@ -401,6 +401,23 @@ test_upstream_version_probe() {
   pass "archive version $ver"
 }
 
+test_simulate_package_stage_dh_check() {
+  echo "==> simulate-package-stage dh-check (stub debian/tmp + dh_install)"
+  local tmp host
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-simulate.XXXXXX")"
+  trap 'rm -rf "$tmp"' RETURN
+  host="$(host_series)"
+  if [[ -n "$host" && "$SERIES" != "$host" ]]; then
+    SIMULATE_ALLOW_CROSS_SERIES=1 WORK_DIR="$tmp/work" SERIES="$SERIES" \
+      "$REPO_ROOT/scripts/simulate-package-stage.sh" dh-check
+  else
+    WORK_DIR="$tmp/work" SERIES="$SERIES" \
+      "$REPO_ROOT/scripts/simulate-package-stage.sh" dh-check
+  fi
+  pass "simulate dh-check"
+  trap - RETURN
+}
+
 main() {
   echo "==> test-build-scripts series=$SERIES layout=$LAYOUT"
   [[ -f "$PATCH" ]] || fail "missing $PATCH"
@@ -417,6 +434,7 @@ main() {
   test_rules_refresh_without_cached_tarball
   test_work_cache_roundtrip
   test_work_cache_refuses_corrupt_tree
+  test_simulate_package_stage_dh_check
 
   echo "==> pretest-patch.sh (patch apply + markers)"
   "$REPO_ROOT/scripts/pretest-patch.sh" "$SERIES"
