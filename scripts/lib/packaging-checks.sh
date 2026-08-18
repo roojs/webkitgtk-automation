@@ -27,6 +27,8 @@ assert_patched_rules_markers() {
     || { echo "error: locale .mo cleanup missing from override_dh_auto_install" >&2; return 1; }
   grep -Fq 'libwebkitgtk-6.0-webdriver4.install' "$rules" \
     || { echo "error: locale lines must be stripped from webdriver4.install" >&2; return 1; }
+  grep -q 'grep -v.*WebKitGTK-6.0' "$rules" \
+    || { echo "error: locale must be filtered when generating webdriver4.install" >&2; return 1; }
   grep -q 'gir-1.0' "$rules" \
     || { echo "error: GIR cleanup path must target gir-1.0" >&2; return 1; }
   grep -q 'fuse-ld=gold' "$rules" \

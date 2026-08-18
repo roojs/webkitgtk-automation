@@ -449,6 +449,13 @@ drop_stale_packaging_files_after_rules_refresh() {
     debian/clean
 }
 
+regenerate_packaging_install_files() {
+  # override_dh_auto_configure writes debian/*.install; required after rules refresh
+  # when compile is skipped (STAGE=compiled) so package does not run configure.
+  echo "==> regenerating debian install manifests via debian/rules configure"
+  fakeroot debian/rules configure
+}
+
 strip_gtk4_cmake_configure_state() {
   # Deleting only CMakeCache.txt leaves build.ninja; ninja install then re-runs cmake
   # without debian's -DPORT=GTK. Drop ninja metadata so override_dh_auto_configure runs.
@@ -561,6 +568,7 @@ cd "$SRC_DIR"
 
 if [[ "$RULES_REFRESHED" == "1" ]]; then
   drop_stale_packaging_files_after_rules_refresh
+  regenerate_packaging_install_files
 fi
 
 ensure_debian_control

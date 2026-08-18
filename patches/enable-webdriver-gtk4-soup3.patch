@@ -100,7 +100,7 @@ b/debian/rules	2026-08-17 04:07:26.039385186 +0000
 +			wd=`echo $$dst | $(WEBKIT_DH_RENAME_WEBDRIVER_NAMES)` ; \
 +			case $$src in *-dev.install|gir*.install|*.docs) ;; \
 +			*) \
-+				$(WEBKIT_DH_RENAME_GTK4) debian/$$src | $(WEBKIT_DH_RENAME_WEBDRIVER) > debian/$$wd ; \
++				$(WEBKIT_DH_RENAME_GTK4) debian/$$src | $(WEBKIT_DH_RENAME_WEBDRIVER) | grep -v 'usr/share/locale.*WebKitGTK-6.0\.mo' > debian/$$wd ; \
 +				echo debian/$$wd >> debian/clean ; \
 +			esac ; \
  		done ; \
@@ -122,7 +122,7 @@ b/debian/rules	2026-08-17 04:07:26.039385186 +0000
  	if [ "$(USE_OLD_PKG_NAMES)" = "YES" ]; then \
  		for src in $(WEBKIT_DOC_DH_FILES); do \
  			dst=`echo $$src | $(WEBKIT_DH_RENAME_DOC)` ; \
-@@ -332,19 +380,32 @@
+@@ -332,19 +380,34 @@
  		$(ENABLE_WEBDRIVER_SOUP3) -DENABLE_DOCUMENTATION=OFF
  	$(GTK4_BUILD) WK_USE_CCACHE=NO dh_auto_configure -Bbuild-gtk4 -- \
  		$(EXTRA_CMAKE_ARGUMENTS) \
@@ -153,7 +153,9 @@ b/debian/rules	2026-08-17 04:07:26.039385186 +0000
 +	rm -rf debian/tmp/usr/include/webkitgtk-6.0
 +	rm -rf debian/tmp/usr/lib/*/webkitgtk-6.0-webdriver/jsc
 +	find debian/tmp -path '*/LC_MESSAGES/WebKitGTK-6.0.mo' -delete
-+	sed -i '/usr\/share\/locale.*WebKitGTK-6.0\.mo/d' debian/libwebkitgtk-6.0-webdriver4.install
++	if [ -f debian/libwebkitgtk-6.0-webdriver4.install ]; then \
++		sed -i '/usr\/share\/locale.*WebKitGTK-6.0\.mo/d' debian/libwebkitgtk-6.0-webdriver4.install; \
++	fi
  
  override_dh_auto_clean: debian/control
  	$(SOUP2_BUILD) dh_auto_clean -Bbuild-soup2
