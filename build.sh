@@ -433,27 +433,19 @@ RULES_REFRESHED=0
 CMAKE_REFRESHED=0
 
 drop_stale_packaging_files_after_rules_refresh() {
-  # gtk4-only control omits gtk3 binaries; regenerated install lists must match
-  # override_dh_auto_configure. Packaging-only rules edits do not need a cmake reset.
-  echo "==> dropping stale gtk4 debhelper files after rules refresh"
+  # gtk4-only control omits stock gtk4 binary packages; drop their generated
+  # install stubs. Keep webdriver install manifests: override_dh_auto_install
+  # corrects them at package time when compile is skipped (STAGE=compiled).
+  # Install lists are only created in override_dh_auto_configure (build phase);
+  # debian/rules has no separate configure target (dh configure does not exist).
+  echo "==> dropping stale stock gtk4 debhelper files after rules refresh"
   rm -f \
     debian/libwebkitgtk-6.0-4.install \
     debian/libwebkitgtk-6.0-dev.install \
-    debian/libwebkitgtk-6.0-webdriver4.install \
-    debian/libwebkitgtk-6.0-webdriver-dev.install \
     debian/gir1.2-webkit-6.0.install \
     debian/libjavascriptcoregtk-6.0-1.install \
     debian/libjavascriptcoregtk-6.0-dev.install \
-    debian/gir1.2-javascriptcoregtk-6.0.install \
-    debian/webkitgtk-6.0-webdriver.pc \
-    debian/clean
-}
-
-regenerate_packaging_install_files() {
-  # override_dh_auto_configure writes debian/*.install; required after rules refresh
-  # when compile is skipped (STAGE=compiled) so package does not run configure.
-  echo "==> regenerating debian install manifests via debian/rules configure"
-  fakeroot debian/rules configure
+    debian/gir1.2-javascriptcoregtk-6.0.install
 }
 
 strip_gtk4_cmake_configure_state() {
@@ -568,7 +560,6 @@ cd "$SRC_DIR"
 
 if [[ "$RULES_REFRESHED" == "1" ]]; then
   drop_stale_packaging_files_after_rules_refresh
-  regenerate_packaging_install_files
 fi
 
 ensure_debian_control
