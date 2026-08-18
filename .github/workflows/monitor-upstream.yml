@@ -45,6 +45,6 @@ jobs:
           FORCE_BUILD: ${{ github.event.inputs.force_build == 'true' && '1' || '0' }}
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq devscripts zstd binutils-gold
+          sudo apt-get install -y -qq devscripts debhelper fakeroot zstd binutils-gold
           chmod +x ./scripts/upstream-webkit-version.sh ./scripts/monitor-upstream-build.sh
           ./scripts/monitor-upstream-build.sh

@@ -187,10 +187,14 @@ SOURCES
 }
 
 install_test_deps() {
-  command -v dh_listpackages >/dev/null 2>&1 && command -v zstd >/dev/null 2>&1 && return 0
-  echo "==> installing test deps (devscripts, zstd)"
-  if ! sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq devscripts zstd >/dev/null 2>&1; then
-    echo "  warn: could not install devscripts/zstd now (apt busy?); continuing with what is installed" >&2
+  command -v dh_listpackages >/dev/null 2>&1 \
+    && command -v dh_install >/dev/null 2>&1 \
+    && command -v fakeroot >/dev/null 2>&1 \
+    && command -v zstd >/dev/null 2>&1 && return 0
+  echo "==> installing test deps (devscripts, debhelper, fakeroot, zstd)"
+  if ! sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+    devscripts debhelper fakeroot zstd >/dev/null 2>&1; then
+    echo "  warn: could not install test deps now (apt busy?); continuing with what is installed" >&2
   fi
 }
 
@@ -403,6 +407,10 @@ test_upstream_version_probe() {
 
 test_simulate_package_stage_dh_check() {
   echo "==> simulate-package-stage dh-check (stub debian/tmp + dh_install)"
+  install_test_deps
+  if ! command -v dh_install >/dev/null 2>&1 || ! command -v fakeroot >/dev/null 2>&1; then
+    fail "simulate dh-check needs debhelper and fakeroot (apt install debhelper fakeroot)"
+  fi
   local tmp host
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-simulate.XXXXXX")"
   trap 'rm -rf "$tmp"' RETURN
