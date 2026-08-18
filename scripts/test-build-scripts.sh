@@ -76,13 +76,14 @@ test_shell_syntax() {
 
 test_compile_cache_key_pipefail() {
   echo "==> compile-cache-key parsing (set -o pipefail)"
-  local key
+  local key expected
+  expected="$(read_compile_cache_key "$COMPILE_CACHE_KEY_FILE")"
   (
     set -euo pipefail
     key="$(read_compile_cache_key "$COMPILE_CACHE_KEY_FILE")"
-    [[ "$key" == "v6" ]] || exit 1
-  ) || fail "expected compile cache key v6 under pipefail"
-  pass "key=v6"
+    [[ "$key" == "$expected" ]] || exit 1
+  ) || fail "expected compile cache key $expected under pipefail"
+  pass "key=$expected"
 
   echo "==> compile-cache-key regression (broken tr|grep pipeline must fail)"
   if (
@@ -101,7 +102,8 @@ test_compile_cache_key_pipefail() {
 
 test_marker_matching() {
   echo "==> work-tree marker matching"
-  local tmp marker
+  local tmp marker compile_key
+  compile_key="$(read_compile_cache_key "$COMPILE_CACHE_KEY_FILE")"
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-marker.XXXXXX")"
   marker="$tmp/$MARKER_NAME"
   trap 'rm -rf "$tmp"' RETURN
@@ -122,10 +124,10 @@ test_marker_matching() {
   cat >"$marker" <<EOF
 SERIES=resolute
 SUFFIX=+webkitgtk1
-COMPILE_CACHE_KEY=v6
+COMPILE_CACHE_KEY=$compile_key
 PATCH_SHA256=abc
 EOF
-  marker_matches "$marker" resolute '+webkitgtk1' v6 || fail "new marker should match"
+  marker_matches "$marker" resolute '+webkitgtk1' "$compile_key" || fail "new marker should match"
   marker_matches "$marker" resolute '+webkitgtk1' v5 && fail "wrong compile key should not match"
   pass "new marker"
 
@@ -134,7 +136,7 @@ SERIES=resolute
 SUFFIX=+webkitgtk1
 PATCH_SHA256=abc
 EOF
-  marker_matches "$marker" resolute '+webkitgtk1' v6 || fail "legacy marker should match"
+  marker_matches "$marker" resolute '+webkitgtk1' "$compile_key" || fail "legacy marker should match"
   pass "legacy marker"
   trap - RETURN
 }
@@ -292,10 +294,11 @@ test_work_cache_roundtrip() {
 
   mkdir -p "$src/build-gtk4" "$cache_root"
   echo "ninja marker" >"$src/build-gtk4/.ninja_log"
+  compile_key="$(read_compile_cache_key "$COMPILE_CACHE_KEY_FILE")"
   cat >"$src/$MARKER_NAME" <<EOF
 SERIES=resolute
 SUFFIX=+webkitgtk1
-COMPILE_CACHE_KEY=v6
+COMPILE_CACHE_KEY=$compile_key
 PATCH_SHA256=dummy
 EOF
 
