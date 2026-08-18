@@ -28,54 +28,66 @@ EOF
 }
 
 inject_install_manifest_target() {
-  local rules="$1"
+  local rules="$1" layout="$2"
   if grep -q '^webkitgtk-webdriver-install-manifests:' "$rules" \
     || grep -q '^webkitgtk-automation-install-manifests:' "$rules"; then
     return 0
   fi
-  cat >>"$rules" <<'EOF'
+  local gtk4_sed_cmd='$(WEBKIT_DH_CONVERT_GTK4)'
+  if [[ "$layout" == soup3-gtk4 ]]; then
+    gtk4_sed_cmd='$(WEBKIT_DH_RENAME_GTK4)'
+  fi
+  cat >>"$rules" <<EOF
 
 # webkitgtk-automation: local simulate-package-stage helper (no cmake).
 webkitgtk-automation-install-manifests:
 	echo debian/clean > debian/clean
-	if [ "$(ENABLE_GTK4)" = "YES" ]; then \
-		for src in $(WEBKIT_DH_FILES); do \
-			dst=`echo $$src | $(WEBKIT_DH_RENAME_GTK4)` ; \
-			wd=`echo $$dst | $(WEBKIT_DH_RENAME_WEBDRIVER_NAMES)` ; \
-			case $$src in *-dev.install|gir*.install|*.docs) ;; \
-			*) \
-				$(WEBKIT_DH_CONVERT_GTK4) debian/$$src | $(WEBKIT_DH_RENAME_WEBDRIVER) | grep -v 'usr/share/locale.*WebKitGTK-6.0\.mo' > debian/$$wd ; \
-				echo debian/$$wd >> debian/clean ; \
-			esac ; \
-		done ; \
+	if [ "\$(ENABLE_GTK4)" = "YES" ]; then \\
+		for src in \$(WEBKIT_DH_FILES); do \\
+			dst=\`echo \$\$src | \$(WEBKIT_DH_RENAME_GTK4)\` ; \\
+			wd=\`echo \$\$dst | \$(WEBKIT_DH_RENAME_WEBDRIVER_NAMES)\` ; \\
+			case \$\$src in *-dev.install|gir*.install|*.docs) ;; \\
+			*) \\
+				${gtk4_sed_cmd} debian/\$\$src | \$(WEBKIT_DH_RENAME_WEBDRIVER) | grep -v 'usr/share/locale.*WebKitGTK-6.0\\.mo' > debian/\$\$wd ; \\
+				echo debian/\$\$wd >> debian/clean ; \\
+			esac ; \\
+		done ; \\
 	fi
-	@{ \
-		echo 'prefix=/usr'; \
-		echo 'libdir=$${prefix}/lib/$(DEB_HOST_MULTIARCH)'; \
-		echo 'includedir=$${prefix}/include'; \
-		echo ''; \
-		echo 'Name: webkitgtk-6.0-webdriver'; \
-		echo 'Description: WebKitGTK 6.0 with WebDriver interactions (parallel install)'; \
-		echo 'Version: $(shell dpkg-parsechangelog -S Version)'; \
-		echo 'Requires: gtk4, libsoup-3.0, javascriptcoregtk-6.0'; \
-		echo 'Libs: -L$${libdir} -l:libwebkitgtk-6.0-webdriver.so.4'; \
-		echo 'Cflags: -I$${includedir}/webkitgtk-6.0'; \
+	@{ \\
+		echo 'prefix=/usr'; \\
+		echo 'libdir=\$\${prefix}/lib/\$(DEB_HOST_MULTIARCH)'; \\
+		echo 'includedir=\$\${prefix}/include'; \\
+		echo ''; \\
+		echo 'Name: webkitgtk-6.0-webdriver'; \\
+		echo 'Description: WebKitGTK 6.0 with WebDriver interactions (parallel install)'; \\
+		echo 'Version: \$(shell dpkg-parsechangelog -S Version)'; \\
+		echo 'Requires: gtk4, libsoup-3.0, javascriptcoregtk-6.0'; \\
+		echo 'Libs: -L\$\${libdir} -l:libwebkitgtk-6.0-webdriver.so.4'; \\
+		echo 'Cflags: -I\$\${includedir}/webkitgtk-6.0'; \\
 	} > debian/webkitgtk-6.0-webdriver.pc
-	echo 'debian/webkitgtk-6.0-webdriver.pc usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/' > debian/libwebkitgtk-6.0-webdriver-dev.install
+	echo 'debian/webkitgtk-6.0-webdriver.pc usr/lib/\$(DEB_HOST_MULTIARCH)/pkgconfig/' > debian/libwebkitgtk-6.0-webdriver-dev.install
 	echo debian/webkitgtk-6.0-webdriver.pc >> debian/clean
 EOF
 }
 
 regenerate_install_manifests() {
-  local src="$1"
+  local src="$1" series="$2" layout
+  # shellcheck source=scripts/lib/series-registry.sh
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/series-registry.sh"
+  layout="$(series_layout "$series")"
   cd "$src"
   fakeroot make -f debian/rules debian/control
-  inject_install_manifest_target debian/rules
+  inject_install_manifest_target debian/rules "$layout"
   if grep -q '^webkitgtk-webdriver-install-manifests:' debian/rules; then
     fakeroot make -f debian/rules webkitgtk-webdriver-install-manifests
   else
     fakeroot make -f debian/rules webkitgtk-automation-install-manifests
   fi
+  local install="$src/debian/libwebkitgtk-6.0-webdriver4.install"
+  [[ -f "$install" ]] && [[ -s "$install" ]] || {
+    echo "error: empty or missing $install after manifest regen (layout=$layout)" >&2
+    return 1
+  }
 }
 
 populate_debian_tmp_stubs() {
@@ -98,7 +110,7 @@ populate_debian_tmp_stubs() {
   : >"$src/debian/tmp/usr/include/webkitgtk-6.0/webkit.h"
   mkdir -p "$src/debian/tmp/usr/share/gir-1.0"
   : >"$src/debian/tmp/usr/share/gir-1.0/WebKit-6.0.gir"
-  local multiarch="${DEB_HOST_MULTIARCH:-$(dpkg-architecture -qDEB_HOST_MULTI_ARCH)}"
+  local multiarch="${DEB_HOST_MULTIARCH:-$(dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || echo x86_64-linux-gnu)}"
   mkdir -p "$src/debian/tmp/usr/lib/$multiarch/girepository-1.0"
   : >"$src/debian/tmp/usr/lib/$multiarch/girepository-1.0/JavaScriptCore-6.0.typelib"
   : >"$src/debian/tmp/usr/lib/$multiarch/girepository-1.0/WebKit-6.0.typelib"

@@ -132,7 +132,7 @@ SOURCES
   write_fake_build_gtk4 "$src"
   write_compiled_marker "$src" "$SERIES" "$SUFFIX" "$compile_key" "$PATCH" "$CMAKE_PATCH"
   echo "==> regenerating install manifests (no cmake)"
-  regenerate_install_manifests "$src"
+  regenerate_install_manifests "$src" "$SERIES"
   echo "==> fixture ready: $src"
   echo "    install manifest: $src/debian/libwebkitgtk-6.0-webdriver4.install"
   wc -l "$src/debian/libwebkitgtk-6.0-webdriver4.install"
