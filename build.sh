@@ -28,6 +28,13 @@ DEFAULT_SERIES="$HOST_SERIES"
 if [[ -z "$DEFAULT_SERIES" ]] || ! series_registered "$DEFAULT_SERIES"; then
   DEFAULT_SERIES="resolute"
 fi
+
+STAGE_MODE="all"
+if [[ "${1:-}" == "compile" || "${1:-}" == "package" ]]; then
+  STAGE_MODE="$1"
+  shift
+fi
+
 SERIES="${SERIES:-${1:-$DEFAULT_SERIES}}"
 SUFFIX="${SUFFIX:-${2:-+webdriver1}}"
 PATCH="$(patch_file_for_series "$SERIES")"
@@ -59,7 +66,12 @@ QUIET_BUILD="${QUIET_BUILD:-0}"
 
 usage() {
   cat <<'EOF'
-Usage: ./build.sh [SERIES] [SUFFIX]
+Usage: ./build.sh [STAGE] [SERIES] [SUFFIX]
+
+STAGE:
+  all       compile then package (default)
+  compile   prepare source tree and run debian/rules build (gtk4 only)
+  package   skip compile when STAGE=compiled; run dpkg-buildpackage
 
 Env:
   SERIES              Ubuntu series (default: host VERSION_CODENAME, else resolute)
@@ -281,7 +293,40 @@ marker_cmake_patch_sha256() {
   awk -F= '/^CMAKE_PATCH_SHA256=/ { print $2; exit }' "$marker"
 }
 
-echo "==> series=$SERIES suffix=$SUFFIX (host=${HOST_SERIES:-unknown})"
+marker_stage() {
+  local src="$1"
+  local marker="$src/$MARKER_NAME"
+  [[ -f "$marker" ]] || return 1
+  awk -F= '/^STAGE=/ { print $2; exit }' "$marker"
+}
+
+write_marker() {
+  local src="$1"
+  local stage="${2:-prepared}"
+  cat >"$src/$MARKER_NAME" <<EOF
+SERIES=$SERIES
+SUFFIX=$SUFFIX
+COMPILE_CACHE_KEY=$COMPILE_CACHE_KEY
+PATCH_SHA256=$PATCH_SHA256
+RULES_PATCH_SHA256=$RULES_PATCH_SHA256
+CMAKE_PATCH_SHA256=$CMAKE_PATCH_SHA256
+STAGE=$stage
+PREPARED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+EOF
+}
+
+write_marker_preserving_compiled() {
+  local src="$1"
+  local stage
+  stage="$(marker_stage "$src" || true)"
+  if [[ "$stage" == "compiled" ]] && gtk4_build_tree_looks_complete "$src"; then
+    write_marker "$src" compiled
+  else
+    write_marker "$src" prepared
+  fi
+}
+
+echo "==> stage=$STAGE_MODE series=$SERIES suffix=$SUFFIX (host=${HOST_SERIES:-unknown})"
 echo "==> compile cache key: $COMPILE_CACHE_KEY"
 echo "==> work dir: $WORK_DIR"
 echo "==> ccache:   $CCACHE_DIR (max $CCACHE_MAXSIZE)"
@@ -348,7 +393,9 @@ enable_deb_src() {
 
 enable_deb_src
 
-apt_get build-dep -y webkit2gtk
+if [[ "$STAGE_MODE" != "package" ]]; then
+  apt_get build-dep -y webkit2gtk
+fi
 finalize_apt_cache
 
 mkdir -p "$WORK_DIR" "$DIST_DIR" "$CCACHE_DIR"
@@ -378,19 +425,6 @@ marker_matches() {
     return 0
   fi
   return 1
-}
-
-write_marker() {
-  local src="$1"
-  cat >"$src/$MARKER_NAME" <<EOF
-SERIES=$SERIES
-SUFFIX=$SUFFIX
-COMPILE_CACHE_KEY=$COMPILE_CACHE_KEY
-PATCH_SHA256=$PATCH_SHA256
-RULES_PATCH_SHA256=$RULES_PATCH_SHA256
-CMAKE_PATCH_SHA256=$CMAKE_PATCH_SHA256
-PREPARED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-EOF
 }
 
 SRC_DIR="$(find_src_dir)"
@@ -478,7 +512,11 @@ if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]] && marker_matches "$SRC_DIR"; then
   elif [[ -n "$stored_patch" && -z "$stored_rules" ]]; then
     echo "==> upgrading work-tree marker (split patch hashes, patches unchanged)"
   fi
-  write_marker "$SRC_DIR"
+  if [[ "$CMAKE_REFRESHED" == "1" ]]; then
+    write_marker "$SRC_DIR" prepared
+  else
+    write_marker_preserving_compiled "$SRC_DIR"
+  fi
 else
   if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]]; then
     echo "==> existing tree does not match series/suffix/compile cache key; refreshing work dir"
@@ -516,7 +554,7 @@ else
   dch -v "$NEW_VERSION" "Parallel-install libwebkitgtk-6.0-webdriver with ENABLE_WEBDRIVER (WebKit #318171)."
   dch -r --distribution "$SERIES" ""
 
-  write_marker "$SRC_DIR"
+  write_marker "$SRC_DIR" prepared
 fi
 
 cd "$SRC_DIR"
@@ -527,49 +565,100 @@ fi
 
 ensure_debian_control
 
-if [[ "$CMAKE_REFRESHED" == "1" ]]; then
-  reconfigure_gtk4_after_cmake_patch_refresh
-elif [[ "$RESUME" == "1" ]]; then
-  repair_gtk4_build_tree_if_needed
-fi
+post_prepare_build_state() {
+  if [[ "$CMAKE_REFRESHED" == "1" ]]; then
+    reconfigure_gtk4_after_cmake_patch_refresh
+    write_marker "$SRC_DIR" prepared
+    return 0
+  fi
+  if [[ "$STAGE_MODE" == "package" ]]; then
+    local stage
+    stage="$(marker_stage "$SRC_DIR" || true)"
+    if gtk4_build_tree_looks_complete .; then
+      if [[ "$stage" != "compiled" ]]; then
+        echo "==> package stage: build-gtk4 complete (marker STAGE=$stage)"
+      fi
+      return 0
+    fi
+    echo "error: package stage requires a complete build-gtk4 tree (STAGE=$stage)" >&2
+    exit 1
+  fi
+  if [[ "$RESUME" == "1" ]]; then
+    repair_gtk4_build_tree_if_needed
+  fi
+}
 
-# Ensure PATH/ccache still exported for the package build.
-export PATH="/usr/lib/ccache:${PATH}"
-export CCACHE_DIR
-export CCACHE_NOHASHDIR=1
-export DEB_BUILD_OPTIONS
+run_compile_stage() {
+  local stage
+  stage="$(marker_stage "$SRC_DIR" || true)"
+  if [[ "$stage" == "compiled" ]] && gtk4_build_tree_looks_complete .; then
+    echo "==> STAGE=compiled and build-gtk4 complete; skipping compile"
+    return 0
+  fi
+  echo "==> compiling via debian/rules build (gtk4 cmake+ninja; long-running)"
+  apply_ci_build_limits
+  fakeroot debian/rules build
+  if ! gtk4_build_tree_looks_complete .; then
+    echo "error: compile finished but build-gtk4 is incomplete" >&2
+    exit 1
+  fi
+  write_marker "$SRC_DIR" compiled
+  echo "==> compile stage complete (STAGE=compiled)"
+}
 
-BUILD_ARGS=(-b -us -uc)
-# Always skip pre-clean once the tree is prepared: object dirs (build-gtk4)
-# are what make an interrupted build resumable. Fresh trees have nothing useful
-# to clean anyway.
-BUILD_ARGS+=(-nc)
-if [[ "$RESUME" == "1" ]]; then
-  echo "==> dpkg-buildpackage ${BUILD_ARGS[*]} (resume)"
+run_package_stage() {
+  # Ensure PATH/ccache still exported for the package build.
+  export PATH="/usr/lib/ccache:${PATH}"
+  export CCACHE_DIR
+  export CCACHE_NOHASHDIR=1
+  export DEB_BUILD_OPTIONS
+
+  BUILD_ARGS=(-b -us -uc)
+  # Always skip pre-clean once the tree is prepared: object dirs (build-gtk4)
+  # are what make an interrupted build resumable. Fresh trees have nothing useful
+  # to clean anyway.
+  BUILD_ARGS+=(-nc)
+  if [[ "$RESUME" == "1" ]]; then
+    echo "==> dpkg-buildpackage ${BUILD_ARGS[*]} (resume)"
+  else
+    echo "==> dpkg-buildpackage ${BUILD_ARGS[*]}"
+  fi
+
+  echo "==> packaging .deb (install + binary; compile skipped when STAGE=compiled)"
+  run_dpkg_buildpackage
+
+  echo "==> ccache stats:"
+  ccache -s || true
+
+  PARENT="$(dirname "$SRC_DIR")"
+  shopt -s nullglob
+  RUNTIME_DEBS=("$PARENT"/libwebkitgtk-6.0-webdriver4_*.deb)
+  DEV_DEBS=("$PARENT"/libwebkitgtk-6.0-webdriver-dev_*.deb)
+  shopt -u nullglob
+
+  if [[ ${#RUNTIME_DEBS[@]} -eq 0 || ${#DEV_DEBS[@]} -eq 0 ]]; then
+    echo "error: expected libwebkitgtk-6.0-webdriver4_*.deb and libwebkitgtk-6.0-webdriver-dev_*.deb in $PARENT" >&2
+    ls -la "$PARENT"/*.deb 2>/dev/null || true
+    exit 1
+  fi
+
+  rm -f "$DIST_DIR"/libwebkitgtk-6.0-webdriver4_*.deb "$DIST_DIR"/libwebkitgtk-6.0-webdriver-dev_*.deb
+  cp -a "${RUNTIME_DEBS[@]}" "${DEV_DEBS[@]}" "$DIST_DIR/"
+
+  echo "==> done. packages in $DIST_DIR:"
+  ls -la "$DIST_DIR"/libwebkitgtk-6.0-webdriver*.deb
+}
+
+if [[ "$STAGE_MODE" == "package" ]]; then
+  post_prepare_build_state
+  run_package_stage
+elif [[ "$STAGE_MODE" == "compile" ]]; then
+  post_prepare_build_state
+  run_compile_stage
+  echo "==> ccache stats:"
+  ccache -s || true
 else
-  echo "==> dpkg-buildpackage ${BUILD_ARGS[*]}"
+  post_prepare_build_state
+  run_compile_stage
+  run_package_stage
 fi
-
-echo "==> building packages (long-running; interrupt-safe if WORK_DIR is kept)"
-run_dpkg_buildpackage
-
-echo "==> ccache stats:"
-ccache -s || true
-
-PARENT="$(dirname "$SRC_DIR")"
-shopt -s nullglob
-RUNTIME_DEBS=("$PARENT"/libwebkitgtk-6.0-webdriver4_*.deb)
-DEV_DEBS=("$PARENT"/libwebkitgtk-6.0-webdriver-dev_*.deb)
-shopt -u nullglob
-
-if [[ ${#RUNTIME_DEBS[@]} -eq 0 || ${#DEV_DEBS[@]} -eq 0 ]]; then
-  echo "error: expected libwebkitgtk-6.0-webdriver4_*.deb and libwebkitgtk-6.0-webdriver-dev_*.deb in $PARENT" >&2
-  ls -la "$PARENT"/*.deb 2>/dev/null || true
-  exit 1
-fi
-
-rm -f "$DIST_DIR"/libwebkitgtk-6.0-webdriver4_*.deb "$DIST_DIR"/libwebkitgtk-6.0-webdriver-dev_*.deb
-cp -a "${RUNTIME_DEBS[@]}" "${DEV_DEBS[@]}" "$DIST_DIR/"
-
-echo "==> done. packages in $DIST_DIR:"
-ls -la "$DIST_DIR"/libwebkitgtk-6.0-webdriver*.deb

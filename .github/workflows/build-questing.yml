@@ -146,8 +146,8 @@ jobs:
           df -h
           if [[ -d work ]]; then du -sh work work/* 2>/dev/null || true; fi
 
-      - name: Build packages
-        id: build
+      - name: Compile WebKit (gtk4)
+        id: compile
         env:
           SERIES: ${{ env.SERIES }}
           SUFFIX: ${{ env.SUFFIX }}
@@ -161,11 +161,11 @@ jobs:
           APT_UPGRADE: "0"
         run: |
           chmod +x ./build.sh
-          ./build.sh
+          ./build.sh compile
 
-      - name: Pack work tree for cache
+      - name: Pack work tree after compile
         id: pack-work
-        if: ${{ always() && (steps.build.outcome == 'success' || steps.build.outcome == 'failure' || steps.build.outcome == 'cancelled') }}
+        if: ${{ always() && (steps.compile.outcome == 'success' || steps.compile.outcome == 'failure' || steps.compile.outcome == 'cancelled') }}
         run: |
           set -euo pipefail
           .github/scripts/work-cache.sh pack
@@ -177,6 +177,30 @@ jobs:
           path: ${{ env.WORK_CACHE_DIR }}
           key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
 
+      - name: Save ccache after compile
+        if: ${{ always() && (steps.compile.outcome == 'success' || steps.compile.outcome == 'failure' || steps.compile.outcome == 'cancelled') }}
+        uses: actions/cache/save@v5
+        with:
+          path: cache/ccache
+          key: ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
+
+      - name: Package .deb
+        id: package
+        env:
+          SERIES: ${{ env.SERIES }}
+          SUFFIX: ${{ env.SUFFIX }}
+          CLEAN: ${{ env.CLEAN }}
+          CLEAN_CACHE: ${{ env.CLEAN_CACHE }}
+          CCACHE_MAXSIZE: 4G
+          BUILD_PARALLEL_JOBS: "2"
+          CI_BUILD_LIMITS: "1"
+          DEB_BUILD_OPTIONS: noautodbgsym nodoc nocheck
+          APT_CACHE_DIR: ${{ env.APT_CACHE_DIR }}
+          APT_UPGRADE: "0"
+        run: |
+          chmod +x ./build.sh
+          ./build.sh package
+
       - name: Save apt package cache
         if: always() && steps.restore-apt.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
@@ -184,15 +208,8 @@ jobs:
           path: ${{ env.APT_CACHE_DIR }}
           key: apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build-questing.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/upgrade-runner-to-series.sh', 'build.sh') }}
 
-      - name: Save ccache
-        if: ${{ always() && (steps.build.outcome == 'success' || steps.build.outcome == 'failure' || steps.build.outcome == 'cancelled') }}
-        uses: actions/cache/save@v5
-        with:
-          path: cache/ccache
-          key: ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
-
       - name: Upload .deb artifacts
-        if: ${{ steps.build.outcome == 'success' }}
+        if: ${{ steps.package.outcome == 'success' }}
         uses: actions/upload-artifact@v5
         with:
           name: libwebkitgtk-6.0-${{ env.SERIES }}
@@ -200,7 +217,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: ${{ steps.build.outcome == 'success' }}
+        if: ${{ steps.package.outcome == 'success' }}
         env:
           GH_TOKEN: ${{ github.token }}
           TRIGGER_TAG: ${{ env.TRIGGER_TAG }}
@@ -246,7 +263,7 @@ jobs:
           echo "Published to release: $RELEASE_TAG"
 
       - name: Update tracked upstream version
-        if: ${{ steps.build.outcome == 'success' }}
+        if: ${{ steps.package.outcome == 'success' }}
         env:
           SERIES: ${{ env.SERIES }}
           SUFFIX: ${{ env.SUFFIX }}

@@ -23,6 +23,8 @@ source "$REPO_ROOT/scripts/lib/host-series.sh"
 source "$REPO_ROOT/scripts/lib/series-registry.sh"
 # shellcheck source=scripts/lib/packaging-checks.sh
 source "$REPO_ROOT/scripts/lib/packaging-checks.sh"
+# shellcheck source=scripts/lib/gtk4-build-state.sh
+source "$REPO_ROOT/scripts/lib/gtk4-build-state.sh"
 
 SERIES="${SERIES:-$(host_series)}"
 SERIES="${SERIES:-resolute}"
@@ -61,6 +63,7 @@ test_shell_syntax() {
     "$REPO_ROOT/scripts/lib/host-series.sh" \
     "$REPO_ROOT/scripts/lib/series-registry.sh" \
     "$REPO_ROOT/scripts/lib/packaging-checks.sh" \
+    "$REPO_ROOT/scripts/lib/gtk4-build-state.sh" \
     "$REPO_ROOT/scripts/lib/patch-for-series.sh" \
     "$REPO_ROOT/scripts/test-build-scripts.sh" \
     "$REPO_ROOT/.github/scripts/work-cache.sh" \
@@ -279,6 +282,41 @@ SOURCES
   trap - RETURN
 }
 
+test_marker_stage_compiled() {
+  echo "==> marker STAGE=compiled + build-gtk4 completeness"
+  local tmp src marker
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-stage.XXXXXX")"
+  src="$tmp/webkit2gtk-2.52.3"
+  marker="$src/$MARKER_NAME"
+  trap 'rm -rf "$tmp"' RETURN
+
+  marker_stage_from_file() {
+    awk -F= '/^STAGE=/ { print $2; exit }' "$1"
+  }
+
+  mkdir -p "$src/build-gtk4/CMakeFiles"
+  echo 'CMAKE_GENERATOR:INTERNAL=Ninja' >"$src/build-gtk4/CMakeCache.txt"
+  touch "$src/build-gtk4/build.ninja" "$src/build-gtk4/CMakeFiles/VerifyGlobs.cmake"
+
+  gtk4_build_tree_looks_complete "$src" || fail "complete gtk4 tree fixture"
+  pass "gtk4_build_tree_looks_complete"
+
+  cat >"$marker" <<EOF
+SERIES=resolute
+SUFFIX=+webkitgtk1
+COMPILE_CACHE_KEY=$EXPECTED_COMPILE_CACHE_KEY
+STAGE=compiled
+PATCH_SHA256=dummy
+EOF
+  [[ "$(marker_stage_from_file "$marker")" == "compiled" ]] || fail "STAGE=compiled not read"
+  pass "STAGE=compiled marker"
+
+  rm -f "$src/build-gtk4/build.ninja"
+  gtk4_build_tree_looks_complete "$src" && fail "incomplete tree should not look complete"
+  pass "incomplete tree rejected"
+  trap - RETURN
+}
+
 test_work_cache_roundtrip() {
   echo "==> work-cache pack/unpack"
   local tmp work_root cache_root src
@@ -300,6 +338,7 @@ test_work_cache_roundtrip() {
 SERIES=resolute
 SUFFIX=+webkitgtk1
 COMPILE_CACHE_KEY=$EXPECTED_COMPILE_CACHE_KEY
+STAGE=compiled
 PATCH_SHA256=dummy
 EOF
 
@@ -333,6 +372,7 @@ test_work_cache_refuses_corrupt_tree() {
 SERIES=resolute
 SUFFIX=+webkitgtk1
 COMPILE_CACHE_KEY=$EXPECTED_COMPILE_CACHE_KEY
+STAGE=compiled
 PATCH_SHA256=dummy
 EOF
 
@@ -368,6 +408,7 @@ main() {
   test_shell_syntax
   test_compile_cache_key_pipefail
   test_marker_matching
+  test_marker_stage_compiled
   test_pinned_webkit_version
   test_upstream_version_probe
   test_packaging_flow
