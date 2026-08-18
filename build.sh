@@ -430,6 +430,23 @@ reconfigure_gtk4_after_cmake_patch_refresh() {
   fakeroot debian/rules dh_auto_configure dh_auto_build
 }
 
+gtk4_build_tree_looks_complete() {
+  [[ -f build-gtk4/build.ninja ]] \
+    && [[ -f build-gtk4/CMakeCache.txt ]] \
+    && [[ -f build-gtk4/CMakeFiles/VerifyGlobs.cmake ]] \
+    && grep -q 'CMAKE_GENERATOR:INTERNAL=Ninja' build-gtk4/CMakeCache.txt
+}
+
+repair_gtk4_build_tree_if_needed() {
+  [[ -d build-gtk4 ]] || return 0
+  if gtk4_build_tree_looks_complete; then
+    return 0
+  fi
+  echo "==> build-gtk4 cmake/ninja state incomplete (stale work-cache); repairing"
+  rm -rf build-gtk4/CMakeFiles
+  reconfigure_gtk4_after_cmake_patch_refresh
+}
+
 if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]] && marker_matches "$SRC_DIR"; then
   RESUME=1
   echo "==> resuming existing tree: $SRC_DIR"
@@ -512,6 +529,8 @@ ensure_debian_control
 
 if [[ "$CMAKE_REFRESHED" == "1" ]]; then
   reconfigure_gtk4_after_cmake_patch_refresh
+elif [[ "$RESUME" == "1" ]]; then
+  repair_gtk4_build_tree_if_needed
 fi
 
 # Ensure PATH/ccache still exported for the package build.
