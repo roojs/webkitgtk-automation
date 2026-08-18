@@ -214,6 +214,8 @@ run_dpkg_buildpackage() {
   dpkg-buildpackage "${BUILD_ARGS[@]}"
 }
 
+RULES_PATCH_SHA256="$(sha256sum "$PATCH" | awk '{print $1}')"
+CMAKE_PATCH_SHA256="$(sha256sum "$CMAKE_PATCH" | awk '{print $1}')"
 PATCH_SHA256="$(cat "$PATCH" "$CMAKE_PATCH" | sha256sum | awk '{print $1}')"
 
 apply_rules_patch() {
@@ -257,6 +259,20 @@ marker_patch_sha256() {
   local marker="$src/$MARKER_NAME"
   [[ -f "$marker" ]] || return 1
   awk -F= '/^PATCH_SHA256=/ { print $2; exit }' "$marker"
+}
+
+marker_rules_patch_sha256() {
+  local src="$1"
+  local marker="$src/$MARKER_NAME"
+  [[ -f "$marker" ]] || return 1
+  awk -F= '/^RULES_PATCH_SHA256=/ { print $2; exit }' "$marker"
+}
+
+marker_cmake_patch_sha256() {
+  local src="$1"
+  local marker="$src/$MARKER_NAME"
+  [[ -f "$marker" ]] || return 1
+  awk -F= '/^CMAKE_PATCH_SHA256=/ { print $2; exit }' "$marker"
 }
 
 echo "==> series=$SERIES suffix=$SUFFIX (host=${HOST_SERIES:-unknown})"
@@ -365,6 +381,8 @@ SERIES=$SERIES
 SUFFIX=$SUFFIX
 COMPILE_CACHE_KEY=$COMPILE_CACHE_KEY
 PATCH_SHA256=$PATCH_SHA256
+RULES_PATCH_SHA256=$RULES_PATCH_SHA256
+CMAKE_PATCH_SHA256=$CMAKE_PATCH_SHA256
 PREPARED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
 }
@@ -372,11 +390,12 @@ EOF
 SRC_DIR="$(find_src_dir)"
 RESUME=0
 RULES_REFRESHED=0
+CMAKE_REFRESHED=0
 
-drop_stale_packaging_state_after_rules_refresh() {
-  # Packaging-only rules change: gtk4-only control omits gtk3 binaries, so -N gtk3
-  # flags are invalid. Regenerated install lists must match patched override_dh_auto_configure.
-  echo "==> dropping stale gtk4 debhelper files and cmake cache after rules refresh"
+drop_stale_packaging_files_after_rules_refresh() {
+  # gtk4-only control omits gtk3 binaries; regenerated install lists must match
+  # override_dh_auto_configure. Packaging-only rules edits do not need a cmake reset.
+  echo "==> dropping stale gtk4 debhelper files after rules refresh"
   rm -f \
     debian/libwebkitgtk-6.0-4.install \
     debian/libwebkitgtk-6.0-dev.install \
@@ -388,25 +407,50 @@ drop_stale_packaging_state_after_rules_refresh() {
     debian/gir1.2-javascriptcoregtk-6.0.install \
     debian/webkitgtk-6.0-webdriver.pc \
     debian/clean
-  if [[ -f build-gtk4/CMakeCache.txt ]]; then
-    rm -f build-gtk4/CMakeCache.txt
-  fi
+}
+
+strip_gtk4_cmake_configure_state() {
+  # Deleting only CMakeCache.txt leaves build.ninja; ninja install then re-runs cmake
+  # without debian's -DPORT=GTK. Drop ninja metadata so override_dh_auto_configure runs.
+  rm -f \
+    build-gtk4/CMakeCache.txt \
+    build-gtk4/build.ninja \
+    build-gtk4/.ninja_deps \
+    build-gtk4/.ninja_log
+}
+
+reconfigure_gtk4_after_cmake_patch_refresh() {
+  strip_gtk4_cmake_configure_state
+  echo "==> re-running override_dh_auto_configure after cmake patch refresh"
+  fakeroot debian/rules override_dh_auto_configure
 }
 
 if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]] && marker_matches "$SRC_DIR"; then
   RESUME=1
   echo "==> resuming existing tree: $SRC_DIR"
   cd "$SRC_DIR"
+  stored_rules="$(marker_rules_patch_sha256 "$SRC_DIR" || true)"
+  stored_cmake="$(marker_cmake_patch_sha256 "$SRC_DIR" || true)"
   stored_patch="$(marker_patch_sha256 "$SRC_DIR" || true)"
-  if [[ -n "$stored_patch" && "$stored_patch" != "$PATCH_SHA256" ]]; then
+  if [[ -n "$stored_rules" && -n "$stored_cmake" ]]; then
+    if [[ "$stored_rules" != "$RULES_PATCH_SHA256" ]]; then
+      refresh_debian_rules_from_patch "$SRC_DIR" "$PATCH" || exit 1
+      RULES_REFRESHED=1
+    fi
+    if [[ "$stored_cmake" != "$CMAKE_PATCH_SHA256" ]]; then
+      revert_cmake_patch_if_applied
+      apply_cmake_patch
+      CMAKE_REFRESHED=1
+    fi
+  elif [[ -n "$stored_patch" && "$stored_patch" != "$PATCH_SHA256" ]]; then
+    echo "==> legacy marker: refreshing rules and cmake patches"
     refresh_debian_rules_from_patch "$SRC_DIR" "$PATCH" || exit 1
     revert_cmake_patch_if_applied
     apply_cmake_patch
     RULES_REFRESHED=1
-    write_marker "$SRC_DIR"
-  else
-    write_marker "$SRC_DIR"
+    CMAKE_REFRESHED=1
   fi
+  write_marker "$SRC_DIR"
 else
   if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]]; then
     echo "==> existing tree does not match series/suffix/compile cache key; refreshing work dir"
@@ -450,10 +494,14 @@ fi
 cd "$SRC_DIR"
 
 if [[ "$RULES_REFRESHED" == "1" ]]; then
-  drop_stale_packaging_state_after_rules_refresh
+  drop_stale_packaging_files_after_rules_refresh
 fi
 
 ensure_debian_control
+
+if [[ "$CMAKE_REFRESHED" == "1" ]]; then
+  reconfigure_gtk4_after_cmake_patch_refresh
+fi
 
 # Ensure PATH/ccache still exported for the package build.
 export PATH="/usr/lib/ccache:${PATH}"
