@@ -30,6 +30,8 @@ source "$REPO_ROOT/scripts/lib/series-registry.sh"
 source "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh"
 # shellcheck source=scripts/lib/package-stage-fixture.sh
 source "$REPO_ROOT/scripts/lib/package-stage-fixture.sh"
+# shellcheck source=scripts/lib/package-stage-dump.sh
+source "$REPO_ROOT/scripts/lib/package-stage-dump.sh"
 
 SERIES="${SERIES:-$(host_series)}"
 SERIES="${SERIES:-resolute}"
@@ -50,6 +52,8 @@ MODE:
   package   prepare then ./build.sh package (full debian/rules binary)
 
 Env: SERIES, SUFFIX, WORK_DIR (default ./work)
+      SIMULATE_DUMP=1 (default on GitHub Actions) — log generated install manifests,
+        path lists, substvars to stdout; set SIMULATE_DUMP_DIR to also save files
 EOF
 }
 
@@ -136,23 +140,45 @@ SOURCES
   echo "==> fixture ready: $src"
   echo "    install manifest: $src/debian/libwebkitgtk-6.0-webdriver4.install"
   wc -l "$src/debian/libwebkitgtk-6.0-webdriver4.install"
+  if simulate_dump_enabled; then
+    dump_packaging_fixture_state "$src" "after-manifest-regen"
+  fi
 }
 
 run_dh_check() {
   local src apt_base
+  if simulate_dump_enabled; then
+    SIMULATE_DUMP_DIR="${SIMULATE_DUMP_DIR:-$WORK_DIR/fixture-dump/$SERIES}"
+    mkdir -p "$SIMULATE_DUMP_DIR"
+  fi
   prepare_fixture_tree
   src="$(find_src_dir)"
   apt_base="${WORK_DIR}/archive-apt"
   echo "==> populating debian/tmp from stock Ubuntu libwebkitgtk-6.0-4 (PACKAGE_FIXTURE=${PACKAGE_FIXTURE:-ubuntu})"
   rm -rf "$src/debian/tmp"
   populate_debian_tmp "$src" "$SERIES" "$apt_base"
+  if simulate_dump_enabled; then
+    dump_packaging_fixture_state "$src" "after-populate-tmp"
+  fi
   echo "==> override_dh_auto_install cleanup (no ninja install)"
   run_override_dh_auto_install_cleanup "$src"
+  if simulate_dump_enabled; then
+    dump_packaging_fixture_state "$src" "after-cleanup"
+  fi
   echo "==> dh_install + dh_missing"
   run_dh_install_and_missing "$src"
+  if simulate_dump_enabled; then
+    dump_packaging_fixture_state "$src" "after-dh-install"
+  fi
   echo "==> dh_shlibdeps (stock libjavascriptcoregtk-6.0-1 .deb for JSC SONAME)"
   run_dh_shlibdeps_check "$src" "$SERIES" "$apt_base"
+  if simulate_dump_enabled; then
+    dump_packaging_fixture_state "$src" "after-shlibdeps"
+  fi
   echo "==> dh-check OK"
+  if [[ -n "${SIMULATE_DUMP_DIR:-}" && -d "$SIMULATE_DUMP_DIR" ]]; then
+    echo "==> fixture dump saved under $SIMULATE_DUMP_DIR"
+  fi
 }
 
 run_package_via_build_sh() {

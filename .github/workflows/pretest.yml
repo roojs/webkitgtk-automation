@@ -44,8 +44,17 @@ jobs:
       - name: Test build scripts (no WebKit compile)
         env:
           SERIES: ${{ matrix.series }}
+          SIMULATE_DUMP_DIR: fixture-dump/${{ matrix.series }}
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq devscripts debhelper fakeroot zstd binutils-gold
           chmod +x ./scripts/test-build-scripts.sh ./scripts/pretest-patch.sh
           ./scripts/test-build-scripts.sh
+
+      - name: Upload packaging fixture dump
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: fixture-dump-${{ matrix.series }}
+          path: fixture-dump/${{ matrix.series }}/
+          if-no-files-found: ignore

@@ -66,6 +66,7 @@ test_shell_syntax() {
     "$REPO_ROOT/scripts/lib/gtk4-build-state.sh" \
     "$REPO_ROOT/scripts/lib/archive-apt.sh" \
     "$REPO_ROOT/scripts/lib/package-stage-fixture.sh" \
+    "$REPO_ROOT/scripts/lib/package-stage-dump.sh" \
     "$REPO_ROOT/scripts/simulate-package-stage.sh" \
     "$REPO_ROOT/scripts/lib/patch-for-series.sh" \
     "$REPO_ROOT/scripts/test-build-scripts.sh" \
