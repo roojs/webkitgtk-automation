@@ -137,14 +137,44 @@ run_override_dh_auto_install_cleanup() {
   fi
 }
 
+read_extra_dh_arguments() {
+  local rules="$1" merged from_make from_rules
+  merged="$(make -f "$rules" -pn 2>/dev/null | awk -F'= ' '/^EXTRA_DH_ARGUMENTS =/{v=$2} END{print v}')"
+  merged="${merged#"${merged%%[![:space:]]*}"}"
+  merged="${merged%"${merged##*[![:space:]]}"}"
+  if [[ -n "$merged" && "$merged" != "\\" ]]; then
+    echo "$merged"
+    return 0
+  fi
+  # make -pn can leave split/unexpanded assignments on some hosts; scrape rules.
+  from_rules="$(grep -E '^EXTRA_DH_ARGUMENTS[[:space:]]*\+?=' "$rules" \
+    | sed -E 's/^EXTRA_DH_ARGUMENTS[[:space:]]*\+?=[[:space:]]*//;s/[[:space:]]*\\$//' \
+    | tr '\n' ' ')"
+  from_rules="${from_rules#"${from_rules%%[![:space:]]*}"}"
+  from_rules="${from_rules%"${from_rules##*[![:space:]]}"}"
+  if [[ -n "$from_rules" ]]; then
+    echo "$from_rules"
+    return 0
+  fi
+  return 1
+}
+
 run_dh_install_and_missing() {
   local src="$1"
   local extra
   cd "$src"
-  # --with/--buildsystem are dh sequencer options, not valid on dh_install/dh_missing.
-  extra="$(make -f debian/rules -pn 2>/dev/null | awk -F'= ' '/^EXTRA_DH_ARGUMENTS =/{print $2; exit}')"
-  # shellcheck disable=SC2086
-  fakeroot dh_install $extra
-  # shellcheck disable=SC2086
-  fakeroot dh_missing $extra
+  # Simulate validates webdriver packaging only — do not dh_install the whole
+  # webkit2gtk stack (would require stubs for jsc/gir/webdriver binary, etc.).
+  extra="-plibwebkitgtk-6.0-webdriver4 -plibwebkitgtk-6.0-webdriver-dev"
+  if read_extra_dh_arguments debian/rules >/dev/null 2>&1; then
+    : # rules parseable; webdriver-only -p is intentional for this fixture
+  fi
+  if ! fakeroot dh_install $extra; then
+    echo "error: dh_install failed for webdriver packages (extra=$extra)" >&2
+    return 1
+  fi
+  if ! fakeroot dh_missing $extra; then
+    echo "error: dh_missing failed for webdriver packages (extra=$extra)" >&2
+    return 1
+  fi
 }
