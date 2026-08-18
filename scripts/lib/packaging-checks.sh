@@ -43,6 +43,10 @@ assert_patched_rules_markers() {
     || { echo "error: -Nlibwebkitgtk-doc skip missing" >&2; return 1; }
   grep -q -- '-Nlibjavascriptcoregtk-6.0-1' "$rules" \
     || { echo "error: must skip libjavascriptcoregtk-6.0-1 (system JSC)" >&2; return 1; }
+  grep -q 'override_dh_shlibdeps' "$rules" \
+    || { echo "error: override_dh_shlibdeps missing (system JSC for dpkg-shlibdeps)" >&2; return 1; }
+  grep -q 'dh_shlibdeps -plibwebkitgtk-6.0-webdriver4 -l/usr/lib/' "$rules" \
+    || { echo "error: webdriver dh_shlibdeps must pass -l/usr/lib for system JSC" >&2; return 1; }
 
   case "$layout" in
     soup3-gtk4)

@@ -407,6 +407,7 @@ test_upstream_version_probe() {
 
 test_simulate_package_stage_dh_check() {
   echo "==> simulate-package-stage dh-check (stub debian/tmp + dh_install)"
+  echo "  note: full builds also need override_dh_shlibdeps (real ELFs + system JSC); not exercised here"
   install_test_deps
   if ! command -v dh_install >/dev/null 2>&1 || ! command -v fakeroot >/dev/null 2>&1; then
     fail "simulate dh-check needs debhelper and fakeroot (apt install debhelper fakeroot)"

@@ -608,6 +608,12 @@ run_compile_stage() {
 }
 
 run_package_stage() {
+  # Ensure system JSC/GTK are on disk for dpkg-shlibdeps (webdriver links system JSC).
+  echo "==> ensuring runtime libs for dpkg-shlibdeps (libjavascriptcoregtk-6.0-1)"
+  apt_get install -y --no-install-recommends \
+    libjavascriptcoregtk-6.0-1 \
+    libwebkitgtk-6.0-4
+
   # Ensure PATH/ccache still exported for the package build.
   export PATH="/usr/lib/ccache:${PATH}"
   export CCACHE_DIR

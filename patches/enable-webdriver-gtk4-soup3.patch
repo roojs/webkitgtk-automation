@@ -171,13 +171,16 @@ b/debian/rules	2026-08-17 04:07:26.039385186 +0000
  
  # Create a dummy doc directory in case the "nodoc" build option is set.
  override_dh_install-indep:
-@@ -368,8 +420,7 @@
+@@ -368,8 +420,10 @@
  	$(SOUP2_BUILD) dh_makeshlibs -plibjavascriptcoregtk-4.0-18 -VNone
  	$(SOUP3_BUILD) dh_makeshlibs -plibwebkit2gtk-4.1-0 -Xinjected-bundle
  	$(SOUP3_BUILD) dh_makeshlibs -plibjavascriptcoregtk-4.1-0 -VNone
 -	$(GTK4_BUILD)  dh_makeshlibs -plibwebkitgtk-6.0-4 -Xinjected-bundle
 -	$(GTK4_BUILD)  dh_makeshlibs -plibjavascriptcoregtk-6.0-1 -VNone
 +	$(GTK4_BUILD)  dh_makeshlibs -plibwebkitgtk-6.0-webdriver4 -Xinjected-bundle
++
++override_dh_shlibdeps:
++	$(GTK4_BUILD) dh_shlibdeps -plibwebkitgtk-6.0-webdriver4 -l/usr/lib/$(DEB_HOST_MULTIARCH)
  
  override_dh_auto_test:
  

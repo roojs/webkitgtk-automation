@@ -157,13 +157,16 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
  
  # Create a dummy doc directory in case the "nodoc" build option is set.
  override_dh_install-indep:
-@@ -287,8 +341,7 @@
+@@ -287,8 +341,10 @@
  override_dh_makeshlibs:
  	$(GTK3_BUILD) dh_makeshlibs -plibwebkit2gtk-4.1-0 -Xinjected-bundle
  	$(GTK3_BUILD) dh_makeshlibs -plibjavascriptcoregtk-4.1-0 -VNone
 -	$(GTK4_BUILD) dh_makeshlibs -plibwebkitgtk-6.0-4 -Xinjected-bundle
 -	$(GTK4_BUILD) dh_makeshlibs -plibjavascriptcoregtk-6.0-1 -VNone
 +	$(GTK4_BUILD) dh_makeshlibs -plibwebkitgtk-6.0-webdriver4 -Xinjected-bundle
++
++override_dh_shlibdeps:
++	$(GTK4_BUILD) dh_shlibdeps -plibwebkitgtk-6.0-webdriver4 -l/usr/lib/$(DEB_HOST_MULTIARCH)
  
  # WebKitGTK release tarballs don't ship the files needed to run tests
  override_dh_auto_test:
