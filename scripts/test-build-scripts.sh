@@ -64,6 +64,7 @@ test_shell_syntax() {
     "$REPO_ROOT/scripts/lib/series-registry.sh" \
     "$REPO_ROOT/scripts/lib/packaging-checks.sh" \
     "$REPO_ROOT/scripts/lib/gtk4-build-state.sh" \
+    "$REPO_ROOT/scripts/lib/archive-apt.sh" \
     "$REPO_ROOT/scripts/lib/package-stage-fixture.sh" \
     "$REPO_ROOT/scripts/simulate-package-stage.sh" \
     "$REPO_ROOT/scripts/lib/patch-for-series.sh" \
@@ -189,11 +190,12 @@ SOURCES
 install_test_deps() {
   command -v dh_listpackages >/dev/null 2>&1 \
     && command -v dh_install >/dev/null 2>&1 \
+    && command -v dpkg-deb >/dev/null 2>&1 \
     && command -v fakeroot >/dev/null 2>&1 \
     && command -v zstd >/dev/null 2>&1 && return 0
-  echo "==> installing test deps (devscripts, debhelper, fakeroot, zstd)"
+  echo "==> installing test deps (devscripts, debhelper, fakeroot, dpkg-dev, zstd)"
   if ! sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-    devscripts debhelper fakeroot zstd >/dev/null 2>&1; then
+    devscripts debhelper fakeroot dpkg-dev zstd >/dev/null 2>&1; then
     echo "  warn: could not install test deps now (apt busy?); continuing with what is installed" >&2
   fi
 }
@@ -406,8 +408,7 @@ test_upstream_version_probe() {
 }
 
 test_simulate_package_stage_dh_check() {
-  echo "==> simulate-package-stage dh-check (stub debian/tmp + dh_install)"
-  echo "  note: full builds also need override_dh_shlibdeps (real ELFs + system JSC); not exercised here"
+  echo "==> simulate-package-stage dh-check (stock Ubuntu .debs + dh_install + dh_shlibdeps)"
   install_test_deps
   if ! command -v dh_install >/dev/null 2>&1 || ! command -v fakeroot >/dev/null 2>&1; then
     fail "simulate dh-check needs debhelper and fakeroot (apt install debhelper fakeroot)"

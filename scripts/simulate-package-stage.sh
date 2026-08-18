@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Simulate the CI package stage with stub files — no WebKit compile.
+# Simulate the CI package stage with stock Ubuntu libwebkitgtk-6.0-4 binaries — no WebKit compile.
 #
 # What this exercises (same path as CI after a warm compile cache):
 #   1. Regenerate debian/*.install manifests (override_dh_auto_configure header, no cmake)
-#   2. Populate debian/tmp with empty stubs matching the install manifest
+#   2. Populate debian/tmp from stock Ubuntu libwebkitgtk-6.0-4 .deb (real ELFs, path-renamed)
 #   3. Run override_dh_auto_install cleanup (locale/header/GIR stripping)
 #   4. Optionally dh_install + dh_missing, or full ./build.sh package
 #
@@ -46,7 +46,7 @@ Usage: ./scripts/simulate-package-stage.sh [MODE]
 
 MODE:
   prepare   Fake compiled tree + install manifests only
-  dh-check  prepare + stub debian/tmp + cleanup + dh_install/dh_missing
+  dh-check  prepare + stock Ubuntu debian/tmp + cleanup + dh_install/dh_missing/dh_shlibdeps
   package   prepare then ./build.sh package (full debian/rules binary)
 
 Env: SERIES, SUFFIX, WORK_DIR (default ./work)
@@ -139,24 +139,28 @@ SOURCES
 }
 
 run_dh_check() {
-  local src
+  local src apt_base
   prepare_fixture_tree
   src="$(find_src_dir)"
-  echo "==> stubbing debian/tmp from install manifest"
+  apt_base="${WORK_DIR}/archive-apt"
+  echo "==> populating debian/tmp from stock Ubuntu libwebkitgtk-6.0-4 (PACKAGE_FIXTURE=${PACKAGE_FIXTURE:-ubuntu})"
   rm -rf "$src/debian/tmp"
-  populate_debian_tmp_stubs "$src"
+  populate_debian_tmp "$src" "$SERIES" "$apt_base"
   echo "==> override_dh_auto_install cleanup (no ninja install)"
   run_override_dh_auto_install_cleanup "$src"
   echo "==> dh_install + dh_missing"
   run_dh_install_and_missing "$src"
+  echo "==> dh_shlibdeps (stock libjavascriptcoregtk-6.0-1 .deb for JSC SONAME)"
+  run_dh_shlibdeps_check "$src" "$SERIES" "$apt_base"
   echo "==> dh-check OK"
 }
 
 run_package_via_build_sh() {
   prepare_fixture_tree
-  local src
+  local src apt_base
   src="$(find_src_dir)"
-  populate_debian_tmp_stubs "$src"
+  apt_base="${WORK_DIR}/archive-apt"
+  populate_debian_tmp "$src" "$SERIES" "$apt_base"
   echo "==> ./build.sh package (dpkg-buildpackage -b -nc; may run dh_auto_install/ninja)"
   export SERIES SUFFIX WORK_DIR
   export DEB_BUILD_OPTIONS="${DEB_BUILD_OPTIONS:-noautodbgsym nodoc nocheck}"
