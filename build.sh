@@ -224,8 +224,12 @@ apply_rules_patch() {
 }
 
 apply_cmake_patch() {
-  echo "==> applying $CMAKE_PATCH"
-  patch -p1 < "$CMAKE_PATCH"
+  if patch -p1 --dry-run < "$CMAKE_PATCH" >/dev/null 2>&1; then
+    echo "==> applying $CMAKE_PATCH"
+    patch -p1 < "$CMAKE_PATCH"
+  else
+    echo "==> $CMAKE_PATCH already applied"
+  fi
 }
 
 revert_cmake_patch_if_applied() {
@@ -421,8 +425,9 @@ strip_gtk4_cmake_configure_state() {
 
 reconfigure_gtk4_after_cmake_patch_refresh() {
   strip_gtk4_cmake_configure_state
-  echo "==> re-running override_dh_auto_configure after cmake patch refresh"
-  fakeroot debian/rules override_dh_auto_configure
+  echo "==> re-running gtk4 configure+build via dh (cmake+ninja) after cmake patch refresh"
+  # override_dh_auto_* alone defaults to Unix Makefiles; % dh $@ uses cmake+ninja.
+  fakeroot debian/rules dh_auto_configure dh_auto_build
 }
 
 if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]] && marker_matches "$SRC_DIR"; then
@@ -443,12 +448,18 @@ if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]] && marker_matches "$SRC_DIR"; then
       CMAKE_REFRESHED=1
     fi
   elif [[ -n "$stored_patch" && "$stored_patch" != "$PATCH_SHA256" ]]; then
-    echo "==> legacy marker: refreshing rules and cmake patches"
+    echo "==> legacy marker: refreshing debian/rules after combined patch hash change"
     refresh_debian_rules_from_patch "$SRC_DIR" "$PATCH" || exit 1
-    revert_cmake_patch_if_applied
-    apply_cmake_patch
     RULES_REFRESHED=1
-    CMAKE_REFRESHED=1
+    if patch -p1 --dry-run < "$CMAKE_PATCH" >/dev/null 2>&1; then
+      echo "==> legacy marker: cmake patch not yet applied"
+      apply_cmake_patch
+      CMAKE_REFRESHED=1
+    else
+      echo "==> cmake patch already applied; skipping cmake refresh (rules-only bump)"
+    fi
+  elif [[ -n "$stored_patch" && -z "$stored_rules" ]]; then
+    echo "==> upgrading work-tree marker (split patch hashes, patches unchanged)"
   fi
   write_marker "$SRC_DIR"
 else
