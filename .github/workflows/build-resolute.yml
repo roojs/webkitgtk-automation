@@ -72,7 +72,7 @@ jobs:
     # Prefer a large/self-hosted runner if available. Hosted runners persist
     # apt + ccache + packed work/ (build-gtk4) when under the cache size budget.
     runs-on: ubuntu-26.04
-    timeout-minutes: 360
+    timeout-minutes: 480
 
     steps:
       - name: Check out repository

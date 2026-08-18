@@ -1,12 +1,24 @@
 --- a/Source/cmake/OptionsGTK.cmake
 +++ b/Source/cmake/OptionsGTK.cmake
-@@ -209,2 +209,6 @@
- EXPOSE_STRING_VARIABLE_TO_BUILD(WEBKITGTK_API_VERSION)
- 
+@@ -208,13 +208,17 @@
+ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
+ set(bmalloc_LIBRARY_TYPE OBJECT)
+ set(WTF_LIBRARY_TYPE OBJECT)
 +set(WEBKITGTK_VARIANT_SUFFIX "" CACHE STRING "Optional parallel-install library suffix (e.g. -webdriver)")
 +EXPOSE_STRING_VARIABLE_TO_BUILD(WEBKITGTK_VARIANT_SUFFIX)
 +set(WEBKITGTK_LIBRARY_QUALIFIER "${WEBKITGTK_API_VERSION}${WEBKITGTK_VARIANT_SUFFIX}")
 +
+ set(WebCore_LIBRARY_TYPE OBJECT)
+ 
+ # These are shared variables, but we special case their definition so that we can use the
+ # CMAKE_INSTALL_* variables that are populated by the GNUInstallDirs macro.
+ set(LIB_INSTALL_DIR "${CMAKE_INSTALL_FULL_LIBDIR}" CACHE PATH "Absolute path to library installation directory")
+ set(EXEC_INSTALL_DIR "${CMAKE_INSTALL_FULL_BINDIR}" CACHE PATH "Absolute path to executable installation directory")
+-set(LIBEXEC_INSTALL_DIR "${CMAKE_INSTALL_FULL_LIBEXECDIR}/webkit${WEBKITGTK_API_INFIX}gtk-${WEBKITGTK_API_VERSION}" CACHE PATH "Absolute path to install executables executed by the library")
++set(LIBEXEC_INSTALL_DIR "${CMAKE_INSTALL_FULL_LIBEXECDIR}/webkit${WEBKITGTK_API_INFIX}gtk-${WEBKITGTK_LIBRARY_QUALIFIER}" CACHE PATH "Absolute path to install executables executed by the library")
+ 
+ set(WEBKITGTK_HEADER_INSTALL_DIR "${CMAKE_INSTALL_INCLUDEDIR}/webkitgtk-${WEBKITGTK_API_VERSION}")
+ set(INTROSPECTION_INSTALL_GIRDIR "${CMAKE_INSTALL_FULL_DATADIR}/gir-1.0")
 --- a/Source/WebKit/PlatformGTK.cmake
 +++ b/Source/WebKit/PlatformGTK.cmake
 @@ -10,7 +10,7 @@
@@ -27,7 +39,7 @@
  
  if (NOT DEVELOPER_MODE AND NOT CMAKE_SYSTEM_NAME MATCHES "Darwin")
      WEBKIT_ADD_TARGET_PROPERTIES(WebKit LINK_FLAGS "-Wl,--version-script,${CMAKE_CURRENT_SOURCE_DIR}/webkitglib-symbols.map")
-@@ -520,13 +520,15 @@
+@@ -548,13 +548,15 @@
  endif ()
  
  install(TARGETS webkit${WEBKITGTK_API_INFIX}gtkinjectedbundle
@@ -48,6 +60,3 @@
  else ()
      install(FILES "${CMAKE_BINARY_DIR}/Source/WebKit/webkit2gtk-${WEBKITGTK_API_VERSION}.pc"
                    "${CMAKE_BINARY_DIR}/Source/WebKit/webkit2gtk-web-extension-${WEBKITGTK_API_VERSION}.pc"
-             DESTINATION "${LIB_INSTALL_DIR}/pkgconfig"
-     )
- endif ()
