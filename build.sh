@@ -37,6 +37,8 @@ COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
 source "$REPO_ROOT/scripts/lib/debian-tarball.sh"
 # shellcheck source=scripts/lib/pinned-webkit-version.sh
 source "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh"
+# shellcheck source=scripts/lib/gtk4-build-state.sh
+source "$REPO_ROOT/scripts/lib/gtk4-build-state.sh"
 WORK_DIR="${WORK_DIR:-$REPO_ROOT/work}"
 DIST_DIR="$REPO_ROOT/dist"
 CACHE_DIR="${CACHE_DIR:-$REPO_ROOT/cache}"
@@ -425,29 +427,23 @@ strip_gtk4_cmake_configure_state() {
 
 reconfigure_gtk4_after_cmake_patch_refresh() {
   strip_gtk4_cmake_configure_state
-  echo "==> re-running gtk4 configure+build via dh (cmake+ninja) after cmake patch refresh"
-  # override_dh_auto_* alone defaults to Unix Makefiles; % dh $@ uses cmake+ninja.
-  fakeroot debian/rules dh_auto_configure dh_auto_build
-}
-
-gtk4_build_tree_looks_complete() {
-  [[ -f build-gtk4/build.ninja ]] \
-    && [[ -f build-gtk4/CMakeCache.txt ]] \
-    && [[ -f build-gtk4/CMakeFiles/VerifyGlobs.cmake ]] \
-    && grep -q 'CMAKE_GENERATOR:INTERNAL=Ninja' build-gtk4/CMakeCache.txt
+  rm -rf build-gtk4/CMakeFiles
+  echo "==> re-running gtk4 configure+build via debian/rules build (cmake+ninja)"
+  # override_dh_auto_* alone uses Unix Makefiles; % dh $@ --buildsystem=cmake+ninja
+  # is only applied for targets routed through the dispatcher (e.g. build).
+  fakeroot debian/rules build
 }
 
 repair_gtk4_build_tree_if_needed() {
   if [[ ! -d build-gtk4 ]]; then
-    echo "==> build-gtk4 missing; configuring via dh (cmake+ninja)"
-    fakeroot debian/rules dh_auto_configure dh_auto_build
+    echo "==> build-gtk4 missing; running debian/rules build (cmake+ninja)"
+    fakeroot debian/rules build
     return
   fi
-  if gtk4_build_tree_looks_complete; then
+  if gtk4_build_tree_looks_complete .; then
     return 0
   fi
   echo "==> build-gtk4 cmake/ninja state incomplete (stale work-cache); repairing"
-  rm -rf build-gtk4/CMakeFiles
   reconfigure_gtk4_after_cmake_patch_refresh
 }
 

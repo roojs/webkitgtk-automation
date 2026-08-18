@@ -13,6 +13,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# shellcheck source=scripts/lib/gtk4-build-state.sh
+source "$REPO_ROOT/scripts/lib/gtk4-build-state.sh"
 WORK_DIR="${WORK_DIR:-$REPO_ROOT/work}"
 CACHE_ROOT="${WORK_CACHE_DIR:-$REPO_ROOT/.ci-cache/work}"
 ARCHIVE="$CACHE_ROOT/work-incremental.tar.zst"
@@ -59,6 +61,10 @@ cmd_pack() {
   if [[ ! -f "$src/$MARKER_NAME" ]]; then
     echo "work-cache: refusing to pack — missing $MARKER_NAME (tree not prepared by build.sh)" >&2
     exit 2
+  fi
+  if [[ -d "$src/build-gtk4" ]] && ! gtk4_build_tree_looks_complete "$src"; then
+    echo "work-cache: refusing to pack — build-gtk4 is not resumable (would poison the work cache)" >&2
+    exit 0
   fi
 
   name="$(basename "$src")"

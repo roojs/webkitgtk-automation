@@ -292,8 +292,10 @@ test_work_cache_roundtrip() {
     install_test_deps
   fi
 
-  mkdir -p "$src/build-gtk4" "$cache_root"
-  echo "ninja marker" >"$src/build-gtk4/.ninja_log"
+  mkdir -p "$src/build-gtk4/CMakeFiles" "$cache_root"
+  echo 'ninja marker' >"$src/build-gtk4/.ninja_log"
+  echo 'CMAKE_GENERATOR:INTERNAL=Ninja' >"$src/build-gtk4/CMakeCache.txt"
+  touch "$src/build-gtk4/build.ninja" "$src/build-gtk4/CMakeFiles/VerifyGlobs.cmake"
   cat >"$src/$MARKER_NAME" <<EOF
 SERIES=resolute
 SUFFIX=+webkitgtk1
@@ -313,6 +315,31 @@ EOF
   [[ -f "$src/$MARKER_NAME" ]] || fail "marker missing after unpack"
   [[ -f "$src/build-gtk4/.ninja_log" ]] || fail "build-gtk4 missing after unpack"
   pass "roundtrip preserved marker and build-gtk4/"
+  trap - RETURN
+}
+
+test_work_cache_refuses_corrupt_tree() {
+  echo "==> work-cache refuses non-resumable build-gtk4"
+  local tmp work_root cache_root src archive
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-workcache-corrupt.XXXXXX")"
+  work_root="$tmp/work"
+  cache_root="$tmp/ci-cache/work"
+  archive="$cache_root/work-incremental.tar.zst"
+  src="$work_root/webkit2gtk-2.52.3"
+  trap 'rm -rf "$tmp"' RETURN
+
+  mkdir -p "$src/build-gtk4" "$cache_root"
+  cat >"$src/$MARKER_NAME" <<EOF
+SERIES=resolute
+SUFFIX=+webkitgtk1
+COMPILE_CACHE_KEY=$EXPECTED_COMPILE_CACHE_KEY
+PATCH_SHA256=dummy
+EOF
+
+  WORK_DIR="$work_root" WORK_CACHE_DIR="$cache_root" \
+    "$REPO_ROOT/.github/scripts/work-cache.sh" pack
+  [[ ! -f "$archive" ]] || fail "corrupt build-gtk4 should not be packed"
+  pass "skipped pack for corrupt tree"
   trap - RETURN
 }
 
@@ -346,6 +373,7 @@ main() {
   test_packaging_flow
   test_rules_refresh_without_cached_tarball
   test_work_cache_roundtrip
+  test_work_cache_refuses_corrupt_tree
 
   echo "==> pretest-patch.sh (patch apply + markers)"
   "$REPO_ROOT/scripts/pretest-patch.sh" "$SERIES"

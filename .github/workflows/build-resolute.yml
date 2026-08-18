@@ -166,7 +166,7 @@ jobs:
 
       - name: Pack work tree for cache
         id: pack-work
-        if: ${{ always() && (steps.build.outcome == 'failure' || steps.build.outcome == 'cancelled') }}
+        if: ${{ always() && (steps.build.outcome == 'success' || steps.build.outcome == 'failure' || steps.build.outcome == 'cancelled') }}
         run: |
           set -euo pipefail
           .github/scripts/work-cache.sh pack

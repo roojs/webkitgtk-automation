@@ -7,4 +7,7 @@
 # Do NOT bump for packaging-only debian/rules edits (dh_install skips, jdupes
 # guards, control generation, doc package tweaks) — those re-sync on resume
 # without invalidating build-gtk4/ or ccache.
+#
+# Work-cache entries from failed runs are only saved when build-gtk4/ is
+# resumable (see scripts/lib/gtk4-build-state.sh); corrupt trees are not packed.
 v7
