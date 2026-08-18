@@ -54,7 +54,7 @@ Before spending hours on CI, prove the patch applies to this series’ `debian/r
 ./scripts/pretest-patch.sh resolute # or explicit series
 ```
 
-CI runs the same script as a **pretest** job that gates the heavy build, and on push/PR via `.github/workflows/pretest.yml`.
+CI runs the same script as a **pretest** job that gates the heavy build (on push to `main` via `.github/workflows/pretest.yml`).
 
 ## Build locally
 
