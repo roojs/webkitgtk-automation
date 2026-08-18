@@ -590,11 +590,13 @@ post_prepare_build_state() {
 run_compile_stage() {
   local stage
   stage="$(marker_stage "$SRC_DIR" || true)"
+  # override_dh_auto_configure (install manifests) only runs during debian/rules build.
+  # dpkg-buildpackage -b -nc goes straight to binary and never regenerates *.install.
   if [[ "$stage" == "compiled" ]] && gtk4_build_tree_looks_complete .; then
-    echo "==> STAGE=compiled and build-gtk4 complete; skipping compile"
-    return 0
+    echo "==> STAGE=compiled: debian/rules build (refresh install manifests; ninja no-op)"
+  else
+    echo "==> compiling via debian/rules build (gtk4 cmake+ninja; long-running)"
   fi
-  echo "==> compiling via debian/rules build (gtk4 cmake+ninja; long-running)"
   apply_ci_build_limits
   fakeroot debian/rules build
   if ! gtk4_build_tree_looks_complete .; then
@@ -611,6 +613,13 @@ run_package_stage() {
   export CCACHE_DIR
   export CCACHE_NOHASHDIR=1
   export DEB_BUILD_OPTIONS
+
+  if [[ "$STAGE_MODE" == "package" ]]; then
+    # Standalone package: compile step did not run rules build above.
+    echo "==> package-only: debian/rules build (install manifests; ninja no-op if compiled)"
+    apply_ci_build_limits
+    fakeroot debian/rules build
+  fi
 
   BUILD_ARGS=(-b -us -uc)
   # Always skip pre-clean once the tree is prepared: object dirs (build-gtk4)
