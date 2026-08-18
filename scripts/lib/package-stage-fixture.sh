@@ -98,9 +98,6 @@ populate_debian_tmp_stubs() {
   : >"$src/debian/tmp/usr/include/webkitgtk-6.0/webkit.h"
   mkdir -p "$src/debian/tmp/usr/share/gir-1.0"
   : >"$src/debian/tmp/usr/share/gir-1.0/WebKit-6.0.gir"
-  local multiarch="${DEB_HOST_MULTIARCH:-$(dpkg-architecture -qDEB_HOST_MULTI_ARCH)}"
-  mkdir -p "$src/debian/tmp/usr/lib/$multiarch/girepository-1.0"
-  : >"$src/debian/tmp/usr/lib/$multiarch/girepository-1.0/WebKit-6.0.typelib"
 }
 
 run_override_dh_auto_install_cleanup() {
@@ -125,9 +122,10 @@ run_dh_install_and_missing() {
   local src="$1"
   local extra
   cd "$src"
+  # --with/--buildsystem are dh sequencer options, not valid on dh_install/dh_missing.
   extra="$(make -f debian/rules -pn 2>/dev/null | awk -F'= ' '/^EXTRA_DH_ARGUMENTS =/{print $2; exit}')"
   # shellcheck disable=SC2086
-  fakeroot dh_install --with gir --buildsystem=cmake+ninja $extra
+  fakeroot dh_install $extra
   # shellcheck disable=SC2086
-  fakeroot dh_missing --with gir --buildsystem=cmake+ninja $extra
+  fakeroot dh_missing $extra
 }

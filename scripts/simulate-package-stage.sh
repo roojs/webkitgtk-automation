@@ -68,9 +68,11 @@ find_src_dir() {
 
 prepare_fixture_tree() {
   local host pinned compile_key src parent
+  export DEBEMAIL="${DEBEMAIL:-simulate@localhost}"
   host="$(host_series)"
-  if [[ -n "$host" && "$SERIES" != "$host" ]]; then
+  if [[ -n "$host" && "$SERIES" != "$host" && "${SIMULATE_ALLOW_CROSS_SERIES:-0}" != "1" ]]; then
     echo "error: SERIES=$SERIES must match host ($host) for native simulate" >&2
+    echo "       (set SIMULATE_ALLOW_CROSS_SERIES=1 to fetch another series from archive.ubuntu.com)" >&2
     exit 1
   fi
   if ! command -v fakeroot >/dev/null 2>&1 || ! command -v dh_install >/dev/null 2>&1; then
