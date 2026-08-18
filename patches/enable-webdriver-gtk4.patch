@@ -85,7 +85,7 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
  	sed -i '$${/^$$/d}' debian/control # Remove last empty line
  
  override_dh_gencontrol:
-@@ -250,30 +280,62 @@
+@@ -250,30 +281,63 @@
  	if [ "$(ENABLE_GTK4)" = "YES" ]; then \
  		for src in $(WEBKIT_DH_FILES); do \
  			dst=`echo $$src | $(WEBKIT_DH_RENAME_GTK4)` ; \
@@ -142,6 +142,7 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
 +	rm -rf debian/tmp/usr/include/webkitgtk-6.0
 +	rm -rf debian/tmp/usr/lib/*/webkitgtk-6.0-webdriver/jsc
 +	find debian/tmp -path '*/LC_MESSAGES/WebKitGTK-6.0.mo' -delete
++	sed -i '/usr\/share\/locale.*WebKitGTK-6.0\.mo/d' debian/libwebkitgtk-6.0-webdriver4.install
  
  override_dh_auto_clean: debian/control
  	$(GTK3_BUILD) dh_auto_clean -Bbuild-gtk3

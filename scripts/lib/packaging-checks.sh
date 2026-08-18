@@ -25,6 +25,8 @@ assert_patched_rules_markers() {
     || { echo "error: thin -dev header cleanup missing from override_dh_auto_install" >&2; return 1; }
   grep -q 'LC_MESSAGES/WebKitGTK-6.0.mo' "$rules" \
     || { echo "error: locale .mo cleanup missing from override_dh_auto_install" >&2; return 1; }
+  grep -Fq 'libwebkitgtk-6.0-webdriver4.install' "$rules" \
+    || { echo "error: locale lines must be stripped from webdriver4.install" >&2; return 1; }
   grep -q 'gir-1.0' "$rules" \
     || { echo "error: GIR cleanup path must target gir-1.0" >&2; return 1; }
   grep -q 'fuse-ld=gold' "$rules" \
