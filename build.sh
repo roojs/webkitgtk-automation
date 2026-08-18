@@ -438,7 +438,11 @@ gtk4_build_tree_looks_complete() {
 }
 
 repair_gtk4_build_tree_if_needed() {
-  [[ -d build-gtk4 ]] || return 0
+  if [[ ! -d build-gtk4 ]]; then
+    echo "==> build-gtk4 missing; configuring via dh (cmake+ninja)"
+    fakeroot debian/rules dh_auto_configure dh_auto_build
+    return
+  fi
   if gtk4_build_tree_looks_complete; then
     return 0
   fi
