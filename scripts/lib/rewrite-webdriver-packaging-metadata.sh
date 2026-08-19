@@ -33,11 +33,17 @@ rewrite_webdriver_packaging_metadata() {
       print " Ships webkitgtk-6.0-webdriver.pc only. API headers and vapi come from"
       print " system libwebkitgtk-6.0-dev and libjavascriptcoregtk-6.0-dev."
     }
-    function skip_description_body() {
-      while ((getline line) > 0 && line ~ /^[ \t]/) {
-        continue
+    function skip_description_body(    line) {
+      while ((getline line) > 0) {
+        if (line ~ /^Package: /) {
+          return line
+        }
+        if (line ~ /^[ \t]/ || line == "") {
+          continue
+        }
+        return line
       }
-      return line
+      return ""
     }
     function handle_package_line(line,    pkg) {
       sub(/^Package: /, "", line)
@@ -66,12 +72,11 @@ rewrite_webdriver_packaging_metadata() {
           print_dev_body()
         }
         follow = skip_description_body()
-        if (follow != "") {
-          if (follow ~ /^Package: /) {
-            handle_package_line(follow)
-          } else {
-            print follow
-          }
+        if (follow ~ /^Package: /) {
+          print ""
+          handle_package_line(follow)
+        } else if (follow != "") {
+          print follow
         }
         next
       }

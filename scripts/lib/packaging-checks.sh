@@ -115,6 +115,17 @@ assert_patched_control_gtk4_only() {
     echo "error: libjavascriptcoregtk-6.0-1 must use system archive (no binary:Version pin)" >&2
     return 1
   fi
+  local jsc_dev_count
+  jsc_dev_count="$(awk '
+    /^Package: libwebkitgtk-6.0-webdriver-dev$/ { in_dev = 1; next }
+    /^Package: / { in_dev = 0 }
+    in_dev && /^[ \t]+libjavascriptcoregtk-6.0-dev,/ { count++ }
+    END { print count + 0 }
+  ' "$control")"
+  if [[ "$jsc_dev_count" -ne 1 ]]; then
+    echo "error: libwebkitgtk-6.0-webdriver-dev must depend on libjavascriptcoregtk-6.0-dev exactly once (got $jsc_dev_count)" >&2
+    return 1
+  fi
 
   case "$layout" in
     soup3-gtk4)

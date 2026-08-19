@@ -82,7 +82,7 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
  		>> debian/control
 +	sed -i 's/libjavascriptcoregtk-6.0-1 (= $${binary:Version})/libjavascriptcoregtk-6.0-1/g' debian/control
 +	sed -i 's/libjavascriptcoregtk-6.0-dev (= $${binary:Version})/libjavascriptcoregtk-6.0-dev/g' debian/control
-+	sed -i '/^Package: libwebkitgtk-6.0-webdriver-dev/,/^$$/ s/^Depends: libwebkitgtk-6.0-webdriver4 (= $${binary:Version}),/Depends: libwebkitgtk-6.0-webdriver4 (= $${binary:Version}),\n         libwebkitgtk-6.0-dev,\n         libjavascriptcoregtk-6.0-dev,/' debian/control
++	sed -i '/^Package: libwebkitgtk-6.0-webdriver-dev/,/^$$/ s/^Depends: libwebkitgtk-6.0-webdriver4 (= $${binary:Version}),/Depends: libwebkitgtk-6.0-webdriver4 (= $${binary:Version}),\n         libwebkitgtk-6.0-dev,/' debian/control
  	sed -i '$${/^$$/d}' debian/control # Remove last empty line
  
  override_dh_gencontrol:
