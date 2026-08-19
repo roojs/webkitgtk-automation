@@ -93,6 +93,14 @@ assert_patched_control_gtk4_only() {
     echo "error: stock libwebkitgtk-6.0-4 must not appear in gtk4-only control" >&2
     return 1
   fi
+  if grep -q 'libjavascriptcoregtk-6.0-dev (= ' "$control"; then
+    echo "error: libjavascriptcoregtk-6.0-dev must use system archive (no binary:Version pin)" >&2
+    return 1
+  fi
+  if grep -q 'libjavascriptcoregtk-6.0-1 (= ' "$control"; then
+    echo "error: libjavascriptcoregtk-6.0-1 must use system archive (no binary:Version pin)" >&2
+    return 1
+  fi
 
   case "$layout" in
     soup3-gtk4)

@@ -76,7 +76,7 @@ b/debian/rules	2026-08-17 04:07:26.039385186 +0000
  # The debhelper files for the documentation package
  WEBKIT_DOC_DH_FILES = \
  	libwebkitgtk-doc.doc-base.javascriptcoregtk \
-@@ -288,10 +313,13 @@
+@@ -288,10 +313,14 @@
  		    -e 's/@WK_API_VERSION@/6.0/g' \
  		    -e 's/@LIBJSC_PKG@/libjavascriptcoregtk-6.0-1/g' \
  		    -e 's/@WEBKIT@/webkit/g' \
@@ -87,6 +87,7 @@ b/debian/rules	2026-08-17 04:07:26.039385186 +0000
 +		    -e 's/libwebkitgtk-6\.0-dev/libwebkitgtk-6.0-webdriver-dev/g' \
  		>> debian/control
 +	sed -i 's/libjavascriptcoregtk-6.0-1 (= $${binary:Version})/libjavascriptcoregtk-6.0-1/g' debian/control
++	sed -i 's/libjavascriptcoregtk-6.0-dev (= $${binary:Version})/libjavascriptcoregtk-6.0-dev/g' debian/control
 +	sed -i '/^Package: libwebkitgtk-6.0-webdriver-dev/,/^$$/ s/^Depends: libwebkitgtk-6.0-webdriver4 (= $${binary:Version}),/Depends: libwebkitgtk-6.0-webdriver4 (= $${binary:Version}),\n         libwebkitgtk-6.0-dev,\n         libjavascriptcoregtk-6.0-dev,/' debian/control
  	sed -i '$${/^$$/d}' debian/control # Remove last empty line
  

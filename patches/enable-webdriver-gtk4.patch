@@ -71,7 +71,7 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
  %:
  	dh $@ --with gir --buildsystem=cmake+ninja $(EXTRA_DH_ARGUMENTS)
  
-@@ -237,9 +263,12 @@
+@@ -237,9 +263,13 @@
  		sed -e 's/@WK_API_VERSION@/6.0/g' \
  		    -e 's/@LIBJSC_PKG@/libjavascriptcoregtk-6.0-1/g' \
  		    -e 's/@WEBKIT@/webkit/g' \
@@ -81,6 +81,7 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
 +		    -e 's/libwebkitgtk-6\.0-dev/libwebkitgtk-6.0-webdriver-dev/g' \
  		>> debian/control
 +	sed -i 's/libjavascriptcoregtk-6.0-1 (= $${binary:Version})/libjavascriptcoregtk-6.0-1/g' debian/control
++	sed -i 's/libjavascriptcoregtk-6.0-dev (= $${binary:Version})/libjavascriptcoregtk-6.0-dev/g' debian/control
 +	sed -i '/^Package: libwebkitgtk-6.0-webdriver-dev/,/^$$/ s/^Depends: libwebkitgtk-6.0-webdriver4 (= $${binary:Version}),/Depends: libwebkitgtk-6.0-webdriver4 (= $${binary:Version}),\n         libwebkitgtk-6.0-dev,\n         libjavascriptcoregtk-6.0-dev,/' debian/control
  	sed -i '$${/^$$/d}' debian/control # Remove last empty line
  
