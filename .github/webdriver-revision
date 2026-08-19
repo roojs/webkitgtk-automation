@@ -2,5 +2,5 @@
 # Bumped automatically after a successful package build is published.
 # Next build for a series uses (revision + 1), e.g. 1 -> +webdriver2.
 plucky=2
-questing=1
+questing=2
 resolute=2
