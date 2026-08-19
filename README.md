@@ -37,3 +37,9 @@ sudo apt remove libwebkitgtk-6.0-webdriver4 libwebkitgtk-6.0-webdriver-dev
 ## Artificial Intelligence Usage
 
 This project was developed with the assistance of artificial intelligence.
+
+- Product design and code design were done by the author
+- AI's main role was writing implementation for review
+- Most of the coding was performed by AI
+- Code was then reviewed, revised, and approved by the author
+- Limited exceptions apply mainly to the build system
