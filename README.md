@@ -8,15 +8,21 @@ Upstream: [WebKit #318171](https://bugs.webkit.org/show_bug.cgi?id=318171)
 
 ## Install
 
-Packages: `libwebkitgtk-6.0-webdriver4` (runtime) and `libwebkitgtk-6.0-webdriver-dev` (pkg-config). Uses system `libjavascriptcoregtk-6.0-1`, `libwebkitgtk-6.0-dev`, and `webkitgtk-webdriver`.
+Packages: `libwebkitgtk-6.0-webdriver4` (runtime) and `libwebkitgtk-6.0-webdriver-dev` (pkg-config). Published for Ubuntu 25.04 (plucky), 25.10 (questing), and 26.04 (resolute) in the [roojs APT repository](https://roojs.github.io/repos/).
 
-Install the `.deb` built for **your** Ubuntu series (plucky 25.04, questing 25.10, resolute 26.04).
-
-1. Download `libwebkitgtk-6.0-webdriver4_*.deb` and `libwebkitgtk-6.0-webdriver-dev_*.deb` from [Releases](../../releases).
-2. Install:
+Add the signing key and sources file (replace `@suite@` with `lsb_release -cs`):
 
 ```bash
-sudo apt install ./libwebkitgtk-6.0-webdriver4_*.deb ./libwebkitgtk-6.0-webdriver-dev_*.deb
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://roojs.github.io/repos/key.gpg \
+  | sudo gpg --dearmor -o /etc/apt/keyrings/roojs.gpg
+
+curl -fsSL https://roojs.github.io/repos/sources \
+  | sed "s/@suite@/$(lsb_release -cs)/" \
+  | sudo tee /etc/apt/sources.list.d/roojs.sources
+
+sudo apt update
+sudo apt install libwebkitgtk-6.0-webdriver4 libwebkitgtk-6.0-webdriver-dev
 ```
 
 Keep system `libwebkitgtk-6.0-4`, `libjavascriptcoregtk-6.0-1`, and `webkitgtk-webdriver` installed. Meson consumers: `dependency('webkitgtk-6.0-webdriver')` (Vala still uses `--pkg=webkitgtk-6.0` for API).
