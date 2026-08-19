@@ -34,10 +34,6 @@ sudo apt remove libwebkitgtk-6.0-webdriver4 libwebkitgtk-6.0-webdriver-dev
 - [Repo layout](docs/layout.md) — paths and roles
 - [Plans](docs/plans/) — implementation history
 
-## Related
-
-- [webkitgtk-android](https://github.com/roojs/webkitgtk-android) — GTK4 Android WebView embed
-
 ## Artificial Intelligence Usage
 
 This project was developed with the assistance of artificial intelligence.
