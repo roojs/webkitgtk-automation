@@ -38,8 +38,7 @@ sudo apt remove libwebkitgtk-6.0-webdriver4 libwebkitgtk-6.0-webdriver-dev
 
 This project was developed with the assistance of artificial intelligence.
 
-- Product design and code design were done by the author
-- AI's main role was writing implementation for review
-- Most of the coding was performed by AI
-- Code was then reviewed, revised, and approved by the author
-- Limited exceptions apply mainly to the build system
+- The author set only a small set of requirements (enable WebDriver on GTK4, parallel-install `.deb`s alongside the distro stack)
+- Build scripts, CI workflows, packaging patches, and documentation were largely AI-generated
+- The author has reviewed the overall approach and key outputs, but not every line in detail
+- Treat scripts and packaging as provisional until exercised on your target Ubuntu series
