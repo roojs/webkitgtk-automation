@@ -6,6 +6,12 @@ Ubuntu’s `debian/rules` enables `-DENABLE_WEBDRIVER=ON` for soup3 (`libwebkit2
 
 Upstream: [WebKit #318171](https://bugs.webkit.org/show_bug.cgi?id=318171)
 
+## Demonstration
+
+Stock `libwebkitgtk-6.0` returns `unsupported operation` for WebDriver Element Click and Send Keys. After installing these packages, both succeed:
+
+https://github.com/user-attachments/assets/c09be86e-9f71-42d1-82da-fc2a4adadb0a
+
 ## Install
 
 Packages: `libwebkitgtk-6.0-webdriver4` (runtime) and `libwebkitgtk-6.0-webdriver-dev` (pkg-config). Published for Ubuntu 25.04 (plucky), 25.10 (questing), and 26.04 (resolute) in the [roojs APT repository](https://roojs.github.io/repos/).
