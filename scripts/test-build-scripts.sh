@@ -25,6 +25,8 @@ source "$REPO_ROOT/scripts/lib/series-registry.sh"
 source "$REPO_ROOT/scripts/lib/packaging-checks.sh"
 # shellcheck source=scripts/lib/rewrite-webdriver-packaging-metadata.sh
 source "$REPO_ROOT/scripts/lib/rewrite-webdriver-packaging-metadata.sh"
+# shellcheck source=scripts/lib/webdriver-revision.sh
+source "$REPO_ROOT/scripts/lib/webdriver-revision.sh"
 # shellcheck source=scripts/lib/gtk4-build-state.sh
 source "$REPO_ROOT/scripts/lib/gtk4-build-state.sh"
 
@@ -396,6 +398,25 @@ EOF
   trap - RETURN
 }
 
+test_webdriver_package_revision() {
+  echo "==> webdriver package revision (+webdriverN)"
+  local tmp
+  tmp="$(mktemp)"
+  cat >"$tmp" <<'EOF'
+plucky=1
+questing=1
+resolute=1
+EOF
+  local next
+  next="$(WEBDRIVER_REVISION_FILE="$tmp" next_webdriver_suffix questing)"
+  [[ "$next" == "+webdriver2" ]] || fail "expected +webdriver2 from revision=1, got $next"
+  WEBDRIVER_REVISION_FILE="$tmp" record_webdriver_revision questing "$next"
+  next="$(WEBDRIVER_REVISION_FILE="$tmp" next_webdriver_suffix questing)"
+  [[ "$next" == "+webdriver3" ]] || fail "expected +webdriver3 after record, got $next"
+  rm -f "$tmp"
+  pass "package revision increments per series"
+}
+
 test_pinned_webkit_version() {
   echo "==> pinned webkit2gtk version"
   local pinned
@@ -443,6 +464,7 @@ main() {
   test_compile_cache_key_pipefail
   test_marker_matching
   test_marker_stage_compiled
+  test_webdriver_package_revision
   test_pinned_webkit_version
   test_upstream_version_probe
   test_packaging_flow

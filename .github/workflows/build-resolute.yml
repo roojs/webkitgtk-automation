@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       suffix:
-        description: Debian version suffix appended to the Ubuntu package version
-        required: true
-        default: "+webdriver1"
+        description: Debian package suffix (+webdriverN). Leave empty to auto-increment per series.
+        required: false
+        default: ""
         type: string
       clean:
         description: Wipe work tree before building (ignore restored work cache)
@@ -41,8 +41,6 @@ env:
   WORK_CACHE_DIR: .ci-cache/work
   # Native build on the runner image — must match runs-on.
   SERIES: resolute
-  # workflow_dispatch inputs are empty on tag pushes — fall back to defaults.
-  SUFFIX: ${{ github.event.inputs.suffix || '+webdriver1' }}
   CLEAN: ${{ github.event.inputs.clean == 'true' && '1' || '0' }}
   CLEAN_CACHE: ${{ github.event.inputs.clean_cache == 'true' && '1' || '0' }}
   REFRESH_APT: ${{ github.event.inputs.refresh_apt_cache == 'true' && '1' || '0' }}
@@ -77,6 +75,16 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+
+      - name: Resolve package version suffix
+        run: |
+          chmod +x .github/scripts/resolve-package-suffix.sh
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.suffix }}" ]]; then
+            echo "SUFFIX=${{ github.event.inputs.suffix }}" >> "$GITHUB_ENV"
+          else
+            echo "SUFFIX=$(.github/scripts/resolve-package-suffix.sh ${{ env.SERIES }})" >> "$GITHUB_ENV"
+          fi
+          echo "Package suffix: ${SUFFIX}"
 
       - name: Free runner disk (remove unused SDKs)
         run: |

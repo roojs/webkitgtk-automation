@@ -81,7 +81,7 @@ Manual `workflow_dispatch` inputs:
 
 | Input | Default | Meaning |
 |-------|---------|---------|
-| `suffix` | `+webkitgtk1` | Appended to the Ubuntu package version |
+| `suffix` | _(auto)_ | Debian package suffix (`+webdriverN`; auto-increments per series from `.github/webdriver-revision`) |
 | `clean` | `false` | Wipe `work/` before building |
 | `clean_cache` | `false` | Also wipe ccache |
 | `refresh_apt_cache` | `false` | Force a new apt cache key (re-download) |

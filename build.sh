@@ -24,6 +24,8 @@ source "$REPO_ROOT/scripts/lib/host-series.sh"
 source "$REPO_ROOT/scripts/lib/series-registry.sh"
 # shellcheck source=scripts/lib/rewrite-webdriver-packaging-metadata.sh
 source "$REPO_ROOT/scripts/lib/rewrite-webdriver-packaging-metadata.sh"
+# shellcheck source=scripts/lib/webdriver-revision.sh
+source "$REPO_ROOT/scripts/lib/webdriver-revision.sh"
 
 HOST_SERIES="$(host_series)"
 DEFAULT_SERIES="$HOST_SERIES"
@@ -38,7 +40,12 @@ if [[ "${1:-}" == "compile" || "${1:-}" == "package" ]]; then
 fi
 
 SERIES="${SERIES:-${1:-$DEFAULT_SERIES}}"
-SUFFIX="${SUFFIX:-${2:-+webdriver1}}"
+if [[ -n "${2:-}" ]]; then
+  SUFFIX="$2"
+elif [[ -z "${SUFFIX:-}" ]]; then
+  SUFFIX="$(next_webdriver_suffix "$SERIES")"
+fi
+SUFFIX="${SUFFIX:-+webdriver1}"
 PATCH="$(patch_file_for_series "$SERIES")"
 CMAKE_PATCH="$REPO_ROOT/patches/webkitgtk-variant-suffix.patch"
 COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
@@ -77,7 +84,7 @@ STAGE:
 
 Env:
   SERIES              Ubuntu series (default: host VERSION_CODENAME, else resolute)
-  SUFFIX              Version suffix (default: +webdriver1)
+  SUFFIX              Debian package suffix (default: next +webdriverN from .github/webdriver-revision)
   WORK_DIR            Unpacked source + object dirs (default: ./work)
   CACHE_DIR           Persistent caches (default: ./cache)
   CCACHE_DIR          ccache directory (default: ./cache/ccache)
