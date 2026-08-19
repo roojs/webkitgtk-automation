@@ -82,6 +82,20 @@ assert_patched_rules_markers() {
   esac
 }
 
+assert_webdriver_packaging_metadata() {
+  local control="$1" changelog="${2:-}"
+  grep -Fxq 'Maintainer: Alan Knowles <alan@roojs.com>' "$control" \
+    || { echo "error: source Maintainer must be roojs" >&2; return 1; }
+  grep -q '^Description: WebKitGTK 6.0 runtime with WebDriver interactions' "$control" \
+    || { echo "error: libwebkitgtk-6.0-webdriver4 description not rewritten" >&2; return 1; }
+  grep -q '^Description: pkg-config for libwebkitgtk-6.0-webdriver' "$control" \
+    || { echo "error: libwebkitgtk-6.0-webdriver-dev description not rewritten" >&2; return 1; }
+  if [[ -n "$changelog" && -f "$changelog" ]]; then
+    grep -q '^ -- Alan Knowles <alan@roojs.com> ' "$changelog" \
+      || { echo "error: changelog footer must list roojs maintainer" >&2; return 1; }
+  fi
+}
+
 assert_patched_control_gtk4_only() {
   local control="$1" layout="$2"
   [[ -f "$control" ]] || { echo "error: missing debian/control" >&2; return 1; }

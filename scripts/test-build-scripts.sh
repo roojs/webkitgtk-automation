@@ -23,6 +23,8 @@ source "$REPO_ROOT/scripts/lib/host-series.sh"
 source "$REPO_ROOT/scripts/lib/series-registry.sh"
 # shellcheck source=scripts/lib/packaging-checks.sh
 source "$REPO_ROOT/scripts/lib/packaging-checks.sh"
+# shellcheck source=scripts/lib/rewrite-webdriver-packaging-metadata.sh
+source "$REPO_ROOT/scripts/lib/rewrite-webdriver-packaging-metadata.sh"
 # shellcheck source=scripts/lib/gtk4-build-state.sh
 source "$REPO_ROOT/scripts/lib/gtk4-build-state.sh"
 
@@ -224,8 +226,10 @@ test_packaging_flow() {
     cd "$src"
     rm -f debian/control
     fakeroot debian/rules debian/control >/dev/null
+    rewrite_webdriver_packaging_metadata .
   )
   assert_patched_control_gtk4_only "$src/debian/control" "$LAYOUT"
+  assert_webdriver_packaging_metadata "$src/debian/control"
   pass "debian/control gtk4-only"
 
   # Simulate refresh_debian_rules_from_patch (build.sh resume path).

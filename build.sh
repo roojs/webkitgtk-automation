@@ -22,6 +22,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$REPO_ROOT/scripts/lib/host-series.sh"
 # shellcheck source=scripts/lib/series-registry.sh
 source "$REPO_ROOT/scripts/lib/series-registry.sh"
+# shellcheck source=scripts/lib/rewrite-webdriver-packaging-metadata.sh
+source "$REPO_ROOT/scripts/lib/rewrite-webdriver-packaging-metadata.sh"
 
 HOST_SERIES="$(host_series)"
 DEFAULT_SERIES="$HOST_SERIES"
@@ -146,8 +148,8 @@ preseed_pbuilder_mirror() {
   fi
 }
 
-export DEBEMAIL="${DEBEMAIL:-webkitgtk-automation@localhost}"
-export DEBFULLNAME="${DEBFULLNAME:-webkitgtk-automation}"
+export DEBEMAIL="${DEBEMAIL:-alan@roojs.com}"
+export DEBFULLNAME="${DEBFULLNAME:-Alan Knowles}"
 export CCACHE_DIR
 export CCACHE_NOHASHDIR=1
 export DEB_BUILD_OPTIONS
@@ -270,6 +272,7 @@ ensure_debian_control() {
     echo "error: debian/control missing after regeneration" >&2
     exit 1
   fi
+  rewrite_webdriver_packaging_metadata .
 }
 
 marker_patch_sha256() {

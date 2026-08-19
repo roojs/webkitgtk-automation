@@ -81,6 +81,9 @@ regenerate_install_manifests() {
   layout="$(series_layout "$series")"
   cd "$src"
   fakeroot make -f debian/rules debian/control
+  # shellcheck source=scripts/lib/rewrite-webdriver-packaging-metadata.sh
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/rewrite-webdriver-packaging-metadata.sh"
+  rewrite_webdriver_packaging_metadata "$src"
   inject_install_manifest_target debian/rules "$layout"
   if grep -q '^webkitgtk-webdriver-install-manifests:' debian/rules; then
     fakeroot make -f debian/rules webkitgtk-webdriver-install-manifests
