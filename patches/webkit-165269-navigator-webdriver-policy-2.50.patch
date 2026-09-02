@@ -1,0 +1,84 @@
+--- a/Source/WTF/Scripts/Preferences/UnifiedWebPreferences.yaml
++++ b/Source/WTF/Scripts/Preferences/UnifiedWebPreferences.yaml
+@@ -5333,6 +5333,18 @@ NavigatorUserAgentDataJavaScriptAPIEnabled:
+     WebCore:
+       default: false
+ 
++NavigatorWebDriverActivePolicy:
++  type: uint32_t
++  refinedType: WebCore::NavigatorWebDriverActivePolicy
++  status: embedder
++  defaultValue:
++    WebKitLegacy:
++      default: static_cast<uint32_t>(WebCore::NavigatorWebDriverActivePolicy::Disabled)
++    WebKit:
++      default: static_cast<uint32_t>(WebCore::NavigatorWebDriverActivePolicy::Disabled)
++    WebCore:
++      default: NavigatorWebDriverActivePolicy::Disabled
++
+ NeedsAdobeFrameReloadingQuirk:
+   comment: 'FIXME: This quirk is needed because of Radar 4674537 and 5211271. We need
+     to phase it out once Adobe can fix the bug from their end.'
+--- a/Source/WebCore/Headers.cmake
++++ b/Source/WebCore/Headers.cmake
+@@ -704,6 +704,8 @@ set(WebCore_PRIVATE_FRAMEWORK_HEADERS
+     Modules/webdatabase/DatabaseTracker.h
+     Modules/webdatabase/OriginLock.h
+ 
++    Modules/webdriver/NavigatorWebDriverActivePolicy.h
++
+     Modules/websockets/ThreadableWebSocketChannel.h
+     Modules/websockets/WebSocketChannelClient.h
+     Modules/websockets/WebSocketChannelInspector.h
+--- a/Source/WebCore/Modules/webdriver/NavigatorWebDriver.cpp
++++ b/Source/WebCore/Modules/webdriver/NavigatorWebDriver.cpp
+@@ -29,7 +29,9 @@
+ #include "FrameInlines.h"
+ #include "LocalFrame.h"
+ #include "Navigator.h"
++#include "NavigatorWebDriverActivePolicy.h"
+ #include "Page.h"
++#include "Settings.h"
+ #include <wtf/TZoneMallocInlines.h>
+ 
+ namespace WebCore {
+@@ -52,6 +54,14 @@ bool NavigatorWebDriver::isControlledByAutomation(const Navigator& navigator)
+     if (!frame || !frame->page())
+         return false;
+ 
++    switch (frame->settings().navigatorWebDriverActivePolicy()) {
++    case NavigatorWebDriverActivePolicy::Enabled:
++        return true;
++    case NavigatorWebDriverActivePolicy::Disabled:
++        return false;
++    case NavigatorWebDriverActivePolicy::Auto:
++        break;
++    }
+     return frame->page()->isControlledByAutomation();
+ }
+ 
+--- a/Source/WebCore/Modules/webdriver/NavigatorWebDriverActivePolicy.h
++++ b/Source/WebCore/Modules/webdriver/NavigatorWebDriverActivePolicy.h
+@@ -0,0 +1,12 @@
++#pragma once
++
++namespace WebCore {
++
++enum class NavigatorWebDriverActivePolicy : uint8_t {
++    Auto,
++    Enabled,
++    Disabled,
++};
++
++}
++
+--- a/Source/WebCore/page/SettingsBase.h
++++ b/Source/WebCore/page/SettingsBase.h
+@@ -36,6 +36,7 @@
+ #include "FourCC.h"
+ #include "HTMLParserScriptingFlagPolicy.h"
+ #include "MediaPlayerEnums.h"
++#include "NavigatorWebDriverActivePolicy.h"
+ #include "StorageBlockingPolicy.h"
+ #include "StorageMap.h"
+ #include "TextDirectionSubmenuInclusionBehavior.h"

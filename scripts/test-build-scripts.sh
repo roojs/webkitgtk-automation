@@ -11,7 +11,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
 # Keep in sync with .github/compile-cache-key when bumping the cache version.
-EXPECTED_COMPILE_CACHE_KEY="v7"
+EXPECTED_COMPILE_CACHE_KEY="v8"
 MARKER_NAME=".webkitgtk-automation-prepared"
 # shellcheck source=scripts/lib/debian-tarball.sh
 source "$REPO_ROOT/scripts/lib/debian-tarball.sh"
@@ -29,6 +29,8 @@ source "$REPO_ROOT/scripts/lib/rewrite-webdriver-packaging-metadata.sh"
 source "$REPO_ROOT/scripts/lib/webdriver-revision.sh"
 # shellcheck source=scripts/lib/gtk4-build-state.sh
 source "$REPO_ROOT/scripts/lib/gtk4-build-state.sh"
+# shellcheck source=scripts/lib/debian-rules-fixture.sh
+source "$REPO_ROOT/scripts/lib/debian-rules-fixture.sh"
 
 SERIES="${SERIES:-$(host_series)}"
 SERIES="${SERIES:-resolute}"
@@ -153,13 +155,24 @@ EOF
 }
 
 fetch_debian_tree() {
-  local dest="$1" pinned
-  local sources lists cache deb_tar
+  local dest="$1"
+  local src="$dest/src"
+  mkdir -p "$src/debian"
+
+  if debian_rules_fixture_ready "$SERIES" "$(read_pinned_webkit_version "$SERIES")"; then
+    copy_debian_rules_fixture "$SERIES" "$src/debian/rules"
+    pass "debian/rules from local fixture"
+    printf '%s\n' "fixture:debian-rules"
+    return 0
+  fi
+
+  local pinned deb_tar
+  local sources lists cache
   pinned="$(read_pinned_webkit_version "$SERIES")"
   sources="$dest/apt-sources.list"
   lists="$dest/apt-lists"
   cache="$dest/apt-cache"
-  mkdir -p "$lists/partial" "$cache/archives/partial" "$dest/src"
+  mkdir -p "$lists/partial" "$cache/archives/partial"
 
   cat >"$sources" <<SOURCES
 deb-src http://archive.ubuntu.com/ubuntu ${SERIES} main universe
@@ -188,7 +201,7 @@ SOURCES
   deb_tar="$(find "$dest" -maxdepth 1 -type f \( -name '*debian.tar.*' -o -name '*.debian.tar.*' \) -print -quit)"
   [[ -n "$deb_tar" ]] || fail "no debian tarball after apt-get source -d"
 
-  tar -xf "$deb_tar" -C "$dest/src"
+  tar -xf "$deb_tar" -C "$src" debian/rules
   printf '%s\n' "$deb_tar"
 }
 
@@ -475,6 +488,10 @@ main() {
 
   echo "==> pretest-patch.sh (patch apply + markers)"
   "$REPO_ROOT/scripts/pretest-patch.sh" "$SERIES"
+
+  echo "==> pretest-webkit-patches.sh"
+  chmod +x "$REPO_ROOT/scripts/pretest-webkit-patches.sh"
+  "$REPO_ROOT/scripts/pretest-webkit-patches.sh" "$SERIES"
 
   echo "==> all tests passed"
 }

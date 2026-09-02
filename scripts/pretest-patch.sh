@@ -5,7 +5,8 @@
 #   ./scripts/pretest-patch.sh           # host series (or SERIES=…)
 #   ./scripts/pretest-patch.sh questing
 #
-# Exit 0 = patch applies cleanly. Exit non-zero = do not start a full build.
+# Local fixtures (gitignored): fixtures/debian-rules/<series>/debian/rules
+# Populate once: ./scripts/fetch-fixtures.sh
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -17,6 +18,8 @@ source "$REPO_ROOT/scripts/lib/series-registry.sh"
 source "$REPO_ROOT/scripts/lib/packaging-checks.sh"
 # shellcheck source=scripts/lib/pinned-webkit-version.sh
 source "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh"
+# shellcheck source=scripts/lib/debian-rules-fixture.sh
+source "$REPO_ROOT/scripts/lib/debian-rules-fixture.sh"
 
 SERIES="${SERIES:-${1:-$(host_series)}}"
 SERIES="${SERIES:-resolute}"
@@ -38,62 +41,14 @@ TMP="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-pretest.XXXXXX")"
 cleanup() { rm -rf "$TMP"; }
 trap cleanup EXIT
 
-fetch_rules_via_archive_apt() {
-  local sources="$TMP/webkitgtk-deb-src.list"
-  local lists="$TMP/apt-lists"
-  local cache="$TMP/apt-cache"
-  mkdir -p "$lists/partial" "$cache/archives/partial"
+mkdir -p "$TMP/src/debian"
 
-  cat >"$sources" <<SOURCES
-deb-src http://archive.ubuntu.com/ubuntu ${SERIES} main universe
-deb-src http://archive.ubuntu.com/ubuntu ${SERIES}-updates main universe
-deb-src http://archive.ubuntu.com/ubuntu ${SERIES}-security main universe
-SOURCES
-
-  local apt_opts=(
-    -o "Dir::Etc::sourcelist=$sources"
-    -o "Dir::Etc::sourceparts=/dev/null"
-    -o "Dir::State::Lists=$lists"
-    -o "Dir::Cache=$cache"
-  )
-
-  echo "==> apt-get update (SERIES=$SERIES archive deb-src only)"
-  apt-get update -qq "${apt_opts[@]}"
-
-  echo "==> apt-get source -d -y webkit2gtk=$PINNED_WEBKIT_VERSION (download-only)"
-  (
-    cd "$TMP"
-    apt-get source -d -y "${apt_opts[@]}" "webkit2gtk=$PINNED_WEBKIT_VERSION"
-    local deb_tar
-    deb_tar="$(find . -maxdepth 1 -type f \( -name '*debian.tar.*' -o -name '*.debian.tar.*' \) | head -n 1)"
-    if [[ -z "$deb_tar" ]]; then
-      echo "error: no debian.tar found after apt-get source -d" >&2
-      ls -la >&2 || true
-      return 1
-    fi
-    echo "==> extracting debian/rules from $deb_tar"
-    mkdir -p src
-    tar -C src -xf "$deb_tar" debian/rules
-    [[ -f src/debian/rules ]]
-  )
-}
-
-fetch_rules_via_launchpad() {
-  local url="https://git.launchpad.net/ubuntu/+source/webkit2gtk/plain/debian/rules?h=ubuntu/${SERIES}"
-  echo "warning: archive apt fetch failed; falling back to Launchpad tip" >&2
-  echo "warning: ubuntu/${SERIES} tip may differ from the published package" >&2
-  echo "==> fallback: curl $url"
-  mkdir -p "$TMP/src/debian"
-  curl -fsSL "$url" -o "$TMP/src/debian/rules"
-  [[ -s "$TMP/src/debian/rules" ]]
-}
-
-if fetch_rules_via_archive_apt; then
-  echo "==> using archive apt debian/rules for $SERIES"
-elif fetch_rules_via_launchpad; then
-  echo "==> using Launchpad debian/rules for ubuntu/$SERIES (tip; not package pin)"
+if debian_rules_fixture_ready "$SERIES" "$PINNED_WEBKIT_VERSION"; then
+  echo "==> using local fixture: $(debian_rules_fixture_path "$SERIES")"
+  copy_debian_rules_fixture "$SERIES" "$TMP/src/debian/rules"
 else
-  echo "error: could not obtain debian/rules for series=$SERIES" >&2
+  echo "error: no local debian/rules fixture for $SERIES ($PINNED_WEBKIT_VERSION)" >&2
+  echo "       run: ./scripts/fetch-fixtures.sh $SERIES" >&2
   exit 1
 fi
 

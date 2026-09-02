@@ -1,5 +1,5 @@
---- a/debian/rules	2026-08-17 04:07:42.227429285 +0000
-b/debian/rules	2026-08-17 04:07:42.303429475 +0000
+--- a/debian/rules
++++ b/debian/rules
 @@ -5,14 +5,26 @@
  include /usr/share/dpkg/architecture.mk
  include /usr/share/dpkg/buildflags.mk
@@ -28,7 +28,7 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
  EXTRA_CMAKE_ARGUMENTS = -DPORT=GTK \
  	   -DCMAKE_INSTALL_LIBEXECDIR=lib/$(DEB_HOST_MULTIARCH) \
  	   -DCMAKE_C_FLAGS_RELEASE="" \
-@@ -75,11 +87,13 @@
+@@ -70,11 +82,13 @@
  
  # The debug packages produced by webkit are huge and cause problems in
  # most buildds. Use -g1 in all architectures to make them smaller.
@@ -45,14 +45,7 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
  
  # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1104703
  ifneq (,$(filter $(DEB_HOST_ARCH),arm64))
-@@ -184,6 +198,10 @@
- 	EXTRA_DH_ARGUMENTS += -Nlibwebkitgtk-doc
- endif
- 
- # The debhelper files for the gtk3 and gtk4 builds are almost
- # identical so we generate the latter from the former.
- WEBKIT_DH_FILES = \
-@@ -217,6 +235,14 @@
+@@ -212,6 +226,14 @@
  			    -e 's/webkit2/webkit/g' \
  			    -e 's/4\.1/6.0/g'
  
@@ -67,7 +60,7 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
  %:
  	dh $@ --with gir --buildsystem=cmake+ninja $(EXTRA_DH_ARGUMENTS)
  
-@@ -237,9 +263,13 @@
+@@ -232,9 +254,13 @@
  		sed -e 's/@WK_API_VERSION@/6.0/g' \
  		    -e 's/@LIBJSC_PKG@/libjavascriptcoregtk-6.0-1/g' \
  		    -e 's/@WEBKIT@/webkit/g' \
@@ -82,7 +75,7 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
  	sed -i '$${/^$$/d}' debian/control # Remove last empty line
  
  override_dh_gencontrol:
-@@ -250,30 +281,67 @@
+@@ -245,30 +271,66 @@
  	if [ "$(ENABLE_GTK4)" = "YES" ]; then \
  		for src in $(WEBKIT_DH_FILES); do \
  			dst=`echo $$src | $(WEBKIT_DH_RENAME_GTK4)` ; \
@@ -152,7 +145,7 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
  
  # Create a dummy doc directory in case the "nodoc" build option is set.
  override_dh_install-indep:
-@@ -287,8 +341,10 @@
+@@ -282,8 +344,10 @@
  override_dh_makeshlibs:
  	$(GTK3_BUILD) dh_makeshlibs -plibwebkit2gtk-4.1-0 -Xinjected-bundle
  	$(GTK3_BUILD) dh_makeshlibs -plibjavascriptcoregtk-4.1-0 -VNone

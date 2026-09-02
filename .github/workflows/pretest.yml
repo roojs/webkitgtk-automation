@@ -41,6 +41,17 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
+      - name: Fetch or restore pretest fixtures
+        uses: actions/cache@v4
+        with:
+          path: fixtures/
+          key: fixtures-${{ matrix.series }}-${{ hashFiles('.github/pinned-webkit-version', 'patches/webkit-*.patch') }}
+
+      - name: Populate pretest fixtures
+        run: |
+          chmod +x ./scripts/fetch-fixtures.sh
+          ./scripts/fetch-fixtures.sh ${{ matrix.series }}
+
       - name: Test build scripts (no WebKit compile)
         env:
           SERIES: ${{ matrix.series }}
