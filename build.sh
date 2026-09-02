@@ -554,14 +554,9 @@ else
   fi
 
   cd "$WORK_DIR"
-  PINNED_WEBKIT_VERSION="$(read_pinned_webkit_version "$SERIES")"
-  echo "==> pulling webkit2gtk source for $SERIES (pinned $PINNED_WEBKIT_VERSION)"
-  if command -v pull-lp-source >/dev/null 2>&1; then
-    # pull-lp-source has no version pin; use apt for reproducible builds.
-    apt_get source "webkit2gtk=$PINNED_WEBKIT_VERSION"
-  else
-    apt_get source "webkit2gtk=$PINNED_WEBKIT_VERSION"
-  fi
+  WEBKIT_SOURCE_VERSION="$("$REPO_ROOT/scripts/upstream-webkit-version.sh" "$SERIES")"
+  echo "==> pulling webkit2gtk source for $SERIES (upstream $WEBKIT_SOURCE_VERSION)"
+  apt_get source "webkit2gtk=$WEBKIT_SOURCE_VERSION"
 
   chown_tree_to_builder "$WORK_DIR"
 
