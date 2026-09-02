@@ -72,8 +72,14 @@ Native build flow (series-specific runner setup differs):
 8. On **failure/cancel**: pack `work/` → save work cache (next run continues)
 9. Save apt / ccache; on success upload `.deb`s and publish a Release
 
-Source versions are pinned in `.github/pinned-webkit-version` (not archive “latest”).
-The CI image’s preinstalled CMake 4.4.x is removed; Ubuntu archive cmake is installed and held.
+**Upstream:** the daily **Monitor upstream webkit2gtk** workflow reads archive
+`Sources` for resolute. When Ubuntu publishes a newer source than we last built,
+it syncs `.github/pinned-webkit-version`, runs pretest, and pushes a
+`build-upstream-*` tag. No manual pin bump.
+
+Builds fetch the series row from `.github/pinned-webkit-version` (kept in sync with
+archive by the monitor). The CI image’s preinstalled CMake 4.4.x is removed;
+Ubuntu archive cmake is installed and held.
 
 If the packed work tree is over ~10 GiB, pack is skipped (Actions cache budget). Raise the repo Actions cache limit, use a self-hosted runner with a persistent `work/`, or rely on ccache alone.
 

@@ -1,7 +1,6 @@
 name: Monitor upstream webkit2gtk
 
-# Daily: if Ubuntu publishes a newer webkit2gtk source for resolute, pretest and push
-# a build-upstream-* tag (same path as manual build-* tags).
+# Daily: follow archive webkit2gtk for resolute — sync pin, pretest, push build tag.
 on:
   schedule:
     - cron: "0 6 * * *"
@@ -38,13 +37,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Restore upstream Sources index cache
+        uses: actions/cache@v5
+        with:
+          path: .cache/upstream-sources
+          key: upstream-sources-${{ env.SERIES }}
+
       - name: Monitor upstream and queue build if needed
         env:
           SERIES: ${{ env.SERIES }}
           DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '0' }}
           FORCE_BUILD: ${{ github.event.inputs.force_build == 'true' && '1' || '0' }}
+          UPSTREAM_SOURCES_CACHE_DIR: .cache/upstream-sources
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq devscripts debhelper fakeroot zstd binutils-gold
           chmod +x ./scripts/upstream-webkit-version.sh ./scripts/monitor-upstream-build.sh
           ./scripts/monitor-upstream-build.sh

@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
-# Read .github/pinned-webkit-version for a SERIES.
+# Read/write .github/pinned-webkit-version for a SERIES.
+# Updated automatically by monitor-upstream-build.sh to match archive upstream.
+
+pinned_webkit_version_file() {
+  if [[ -n "${PINNED_WEBKIT_VERSION_FILE:-}" ]]; then
+    echo "$PINNED_WEBKIT_VERSION_FILE"
+    return 0
+  fi
+  echo "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/.github/pinned-webkit-version"
+}
 
 read_pinned_webkit_version() {
-  local series="$1" file="${PINNED_WEBKIT_VERSION_FILE:-}"
-  local line version
-
-  if [[ -z "$file" ]]; then
-    file="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/.github/pinned-webkit-version"
-  fi
+  local series="$1" file line version
+  file="$(pinned_webkit_version_file)"
   if [[ ! -f "$file" ]]; then
     echo "error: missing pinned webkit version file: $file" >&2
     return 1
@@ -31,4 +36,30 @@ read_pinned_webkit_version() {
 
   echo "error: no pinned webkit2gtk version for series=$series in $file" >&2
   return 1
+}
+
+write_pinned_webkit_version() {
+  local series="$1" version="$2" file tmp found=0
+  file="$(pinned_webkit_version_file)"
+  [[ -f "$file" ]] || {
+    echo "error: missing pinned webkit version file: $file" >&2
+    return 1
+  }
+  tmp="$(mktemp "${TMPDIR:-/tmp}/pinned-webkit-version.XXXXXX")"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" =~ ^[[:space:]]*# ]] || [[ -z "${line//[[:space:]]/}" ]]; then
+      printf '%s\n' "$line"
+      continue
+    fi
+    if [[ "$line" == "${series}="* ]]; then
+      printf '%s=%s\n' "$series" "$version"
+      found=1
+    else
+      printf '%s\n' "$line"
+    fi
+  done <"$file" >"$tmp"
+  if [[ "$found" -eq 0 ]]; then
+    printf '%s=%s\n' "$series" "$version" >>"$tmp"
+  fi
+  mv "$tmp" "$file"
 }
