@@ -4,11 +4,13 @@
 # Usage:
 #   ./scripts/test-build-scripts.sh           # host / SERIES=resolute
 #   SERIES=resolute ./scripts/test-build-scripts.sh
+#   PRETEST_FAST=1 ./scripts/test-build-scripts.sh   # CI pretest (no apt/dh slow paths)
 #
 # Requires: bash, patch, tar, zstd, fakeroot, devscripts (for debian/rules control target).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PRETEST_FAST="${PRETEST_FAST:-0}"
 COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
 # Keep in sync with .github/compile-cache-key when bumping the cache version.
 EXPECTED_COMPILE_CACHE_KEY="v8"
@@ -160,9 +162,13 @@ fetch_debian_tree() {
   mkdir -p "$src/debian"
 
   if debian_rules_fixture_ready "$SERIES" "$(read_pinned_webkit_version "$SERIES")"; then
-    copy_debian_rules_fixture "$SERIES" "$src/debian/rules"
-    pass "debian/rules from local fixture"
-    printf '%s\n' "fixture:debian-rules"
+    local pinned deb_tar
+    pinned="$(read_pinned_webkit_version "$SERIES")"
+    copy_debian_fixture "$SERIES" "$src"
+    deb_tar="$dest/webkit2gtk_${pinned}.debian.tar.xz"
+    tar -cJf "$deb_tar" -C "$src" debian
+    pass "debian/ from local fixture"
+    printf '%s\n' "$deb_tar"
     return 0
   fi
 
@@ -430,6 +436,14 @@ EOF
   pass "package revision increments per series"
 }
 
+test_debian_fixture_ready() {
+  echo "==> debian fixture completeness"
+  if ! debian_rules_fixture_ready "$SERIES" "$(read_pinned_webkit_version "$SERIES")"; then
+    fail "incomplete debian fixture for $SERIES (need full debian/ from debian.tar; run ./scripts/fetch-fixtures.sh $SERIES)"
+  fi
+  pass "debian fixture has packaging inputs"
+}
+
 test_pinned_webkit_version() {
   echo "==> pinned webkit2gtk version"
   local pinned
@@ -467,8 +481,12 @@ test_simulate_package_stage_dh_check() {
   trap - RETURN
 }
 
+skip_slow() {
+  echo "  skip: $1 (set PRETEST_FAST=0 to run)"
+}
+
 main() {
-  echo "==> test-build-scripts series=$SERIES layout=$LAYOUT"
+  echo "==> test-build-scripts series=$SERIES layout=$LAYOUT pretest_fast=$PRETEST_FAST"
   [[ -f "$PATCH" ]] || fail "missing $PATCH"
   [[ -f "$COMPILE_CACHE_KEY_FILE" ]] || fail "missing $COMPILE_CACHE_KEY_FILE"
 
@@ -478,13 +496,20 @@ main() {
   test_marker_matching
   test_marker_stage_compiled
   test_webdriver_package_revision
+  test_debian_fixture_ready
   test_pinned_webkit_version
-  test_upstream_version_probe
   test_packaging_flow
-  test_rules_refresh_without_cached_tarball
   test_work_cache_roundtrip
   test_work_cache_refuses_corrupt_tree
-  test_simulate_package_stage_dh_check
+  if [[ "$PRETEST_FAST" == "1" ]]; then
+    skip_slow "upstream webkit2gtk version probe"
+    skip_slow "rules refresh without cached debian tarball"
+    skip_slow "simulate-package-stage dh-check"
+  else
+    test_upstream_version_probe
+    test_rules_refresh_without_cached_tarball
+    test_simulate_package_stage_dh_check
+  fi
 
   echo "==> pretest-patch.sh (patch apply + markers)"
   "$REPO_ROOT/scripts/pretest-patch.sh" "$SERIES"

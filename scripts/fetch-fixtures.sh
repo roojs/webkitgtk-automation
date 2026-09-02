@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-time (or REFRESH=1) download of pretest fixtures — debian/rules + a few WebKit paths.
+# One-time (or REFRESH=1) download of pretest fixtures — debian/ tree + a few WebKit paths.
 #
 # Usage:
 #   ./scripts/fetch-fixtures.sh              # all series in .github/pinned-webkit-version
@@ -37,7 +37,7 @@ fetch_debian_rules_fixture() {
   version_file="$(debian_rules_fixture_version_path "$series")"
 
   if [[ "$REFRESH" != "1" ]] && debian_rules_fixture_ready "$series" "$version"; then
-    echo "==> debian/rules fixture OK: $series ($version)"
+    echo "==> debian fixture OK: $series ($version)"
     return 0
   fi
 
@@ -45,11 +45,12 @@ fetch_debian_rules_fixture() {
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-debian-fixture.XXXXXX")"
   echo "==> fetching debian.tar only: $url"
   curl -fsSL "$url" -o "$tmp/debian.tar.xz"
-  mkdir -p "$dir/debian"
-  tar -xJf "$tmp/debian.tar.xz" -C "$dir" debian/rules
+  mkdir -p "$dir"
+  rm -rf "$dir/debian"
+  tar -xJf "$tmp/debian.tar.xz" -C "$dir"
   echo "$version" >"$version_file"
   rm -rf "$tmp"
-  echo "==> wrote $rules"
+  echo "==> wrote debian fixture under $dir/debian"
 }
 
 fetch_webkit_source_fixture() {

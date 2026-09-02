@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Local cache of stock debian/rules per series (pretest; no WebKit compile).
+# Local cache of stock debian/ tree per series (pretest; no WebKit compile).
 set -euo pipefail
 
 debian_rules_fixtures_root() {
@@ -22,12 +22,26 @@ debian_rules_fixture_version_path() {
   echo "$(debian_rules_fixture_dir "$1")/version"
 }
 
+debian_fixture_required_paths() {
+  cat <<'EOF'
+debian/rules
+debian/changelog
+debian/control.in
+debian/control-common.in
+debian/control-transitional.in
+EOF
+}
+
 debian_rules_fixture_ready() {
   local series="$1" pinned="${2:-}"
-  local rules version_file stored
-  rules="$(debian_rules_fixture_path "$series")"
+  local base version_file stored path
+  base="$(debian_rules_fixture_dir "$series")"
   version_file="$(debian_rules_fixture_version_path "$series")"
-  [[ -s "$rules" && -f "$version_file" ]] || return 1
+  [[ -f "$version_file" ]] || return 1
+  while IFS= read -r path; do
+    [[ -n "$path" ]] || continue
+    [[ -s "$base/$path" ]] || return 1
+  done < <(debian_fixture_required_paths)
   if [[ -n "$pinned" ]]; then
     stored="$(tr -d '[:space:]' <"$version_file")"
     [[ "$stored" == "$pinned" ]] || return 1
@@ -44,4 +58,21 @@ copy_debian_rules_fixture() {
   }
   mkdir -p "$(dirname "$dest")"
   cp -a "$rules" "$dest"
+}
+
+copy_debian_fixture() {
+  local series="$1" dest_parent="$2"
+  local src
+  src="$(debian_rules_fixture_dir "$series")/debian"
+  [[ -d "$src" ]] || {
+    echo "error: missing debian fixture for series=$series ($src)" >&2
+    return 1
+  }
+  if ! debian_rules_fixture_ready "$series"; then
+    echo "error: incomplete debian fixture for series=$series (run ./scripts/fetch-fixtures.sh $series)" >&2
+    return 1
+  fi
+  mkdir -p "$dest_parent"
+  rm -rf "$dest_parent/debian"
+  cp -a "$src" "$dest_parent/debian"
 }
