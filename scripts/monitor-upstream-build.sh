@@ -74,8 +74,8 @@ fi
 echo "==> new upstream version detected ($tracked -> $current)"
 
 echo "==> running script tests"
-chmod +x "$REPO_ROOT/scripts/test-build-scripts.sh" "$REPO_ROOT/scripts/pretest-patch.sh"
-SERIES="$SERIES" "$REPO_ROOT/scripts/test-build-scripts.sh"
+chmod +x "$REPO_ROOT/scripts/run-pretest.sh"
+SERIES="$SERIES" "$REPO_ROOT/scripts/run-pretest.sh"
 
 if [[ "${DRY_RUN:-}" == "1" ]]; then
   tag="$(upstream_build_tag "$current")"

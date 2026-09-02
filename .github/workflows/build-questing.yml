@@ -56,14 +56,19 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v5
 
-      - name: Test build scripts (no WebKit compile)
+      - name: Fetch or restore pretest fixtures
+        uses: actions/cache@v4
+        with:
+          path: fixtures/
+          key: fixtures-${{ env.SERIES }}-${{ hashFiles('.github/pinned-webkit-version', 'patches/webkit-*.patch', 'patches/webkitgtk-variant-suffix.patch', 'scripts/fetch-fixtures.sh', 'scripts/lib/debian-rules-fixture.sh', 'scripts/lib/webkit-source-fixture.sh') }}
+
+      - name: Run pretest
         env:
           SERIES: ${{ env.SERIES }}
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq devscripts debhelper fakeroot zstd binutils-gold
-          chmod +x ./scripts/test-build-scripts.sh ./scripts/pretest-patch.sh
-          ./scripts/test-build-scripts.sh
+          sudo apt-get install -y -qq devscripts debhelper fakeroot zstd binutils-gold curl
+          chmod +x ./scripts/run-pretest.sh
+          ./scripts/run-pretest.sh
 
   build:
     needs: pretest

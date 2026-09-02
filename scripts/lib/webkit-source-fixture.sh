@@ -21,6 +21,7 @@ webkit_source_fixture_version_path() {
 webkit_source_fixture_paths() {
   cat <<'EOF'
 Source/cmake/OptionsGTK.cmake
+Source/WebKit/PlatformGTK.cmake
 Source/WebCore/Headers.cmake
 Source/WebCore/Modules/webdriver/NavigatorWebDriver.cpp
 Source/WebCore/page/SettingsBase.h

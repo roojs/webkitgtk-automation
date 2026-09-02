@@ -45,22 +45,21 @@ jobs:
         uses: actions/cache@v4
         with:
           path: fixtures/
-          key: fixtures-${{ matrix.series }}-${{ hashFiles('.github/pinned-webkit-version', 'patches/webkit-*.patch', 'scripts/fetch-fixtures.sh', 'scripts/lib/debian-rules-fixture.sh') }}
+          key: fixtures-${{ matrix.series }}-${{ hashFiles('.github/pinned-webkit-version', 'patches/webkit-*.patch', 'patches/webkitgtk-variant-suffix.patch', 'scripts/fetch-fixtures.sh', 'scripts/lib/debian-rules-fixture.sh', 'scripts/lib/webkit-source-fixture.sh') }}
 
       - name: Populate pretest fixtures
         run: |
           chmod +x ./scripts/fetch-fixtures.sh
           ./scripts/fetch-fixtures.sh ${{ matrix.series }}
 
-      - name: Test build scripts (no WebKit compile)
+      - name: Run pretest
         env:
           SERIES: ${{ matrix.series }}
-          PRETEST_FAST: "1"
           SIMULATE_DUMP_DIR: fixture-dump/${{ matrix.series }}
         run: |
-          sudo apt-get install -y -qq devscripts debhelper fakeroot zstd binutils-gold
-          chmod +x ./scripts/test-build-scripts.sh ./scripts/pretest-patch.sh
-          ./scripts/test-build-scripts.sh
+          sudo apt-get install -y -qq devscripts debhelper fakeroot zstd binutils-gold curl
+          chmod +x ./scripts/run-pretest.sh
+          ./scripts/run-pretest.sh ${{ matrix.series }}
 
       - name: Upload packaging fixture dump
         if: always()

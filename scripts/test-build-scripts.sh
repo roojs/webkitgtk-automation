@@ -64,6 +64,7 @@ test_shell_syntax() {
   for f in \
     "$REPO_ROOT/build.sh" \
     "$REPO_ROOT/scripts/pretest-patch.sh" \
+    "$REPO_ROOT/scripts/run-pretest.sh" \
     "$REPO_ROOT/scripts/upstream-webkit-version.sh" \
     "$REPO_ROOT/scripts/monitor-upstream-build.sh" \
     "$REPO_ROOT/scripts/lib/debian-tarball.sh" \
