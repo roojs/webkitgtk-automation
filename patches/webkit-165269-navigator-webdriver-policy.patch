@@ -10,11 +10,11 @@
 +  status: embedder
 +  defaultValue:
 +    WebKitLegacy:
-+      default: static_cast<uint32_t>(WebCore::NavigatorWebDriverActivePolicy::Disabled)
++      default: static_cast<uint32_t>(WebCore::NavigatorWebDriverActivePolicy::Auto)
 +    WebKit:
-+      default: static_cast<uint32_t>(WebCore::NavigatorWebDriverActivePolicy::Disabled)
++      default: static_cast<uint32_t>(WebCore::NavigatorWebDriverActivePolicy::Auto)
 +    WebCore:
-+      default: NavigatorWebDriverActivePolicy::Disabled
++      default: NavigatorWebDriverActivePolicy::Auto
 +
  NeedsAdobeFrameReloadingQuirk:
    comment: 'FIXME: This quirk is needed because of Radar 4674537 and 5211271. We need

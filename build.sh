@@ -575,7 +575,7 @@ else
   BASE_VERSION="$(dpkg-parsechangelog -S Version)"
   NEW_VERSION="${BASE_VERSION}${SUFFIX}"
   echo "==> bumping changelog to $NEW_VERSION"
-  dch -v "$NEW_VERSION" "Parallel-install libwebkitgtk-6.0-webdriver (WebKit #318171 interactions, #165269 navigator.webdriver Disabled)."
+  dch -v "$NEW_VERSION" "Parallel-install libwebkitgtk-6.0-webdriver (WebKit #318171 interactions, #165269 navigator.webdriver policy)."
   dch -r --distribution "$SERIES" ""
 
   write_marker "$SRC_DIR" prepared

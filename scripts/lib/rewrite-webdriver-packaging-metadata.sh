@@ -24,8 +24,8 @@ rewrite_webdriver_packaging_metadata() {
     function print_runtime_body() {
       print " Parallel-install rebuild of Ubuntu libwebkitgtk-6.0. Coexists with"
       print " system libwebkitgtk-6.0-4 and links against stock libjavascriptcoregtk-6.0-1."
-      print " WebDriver interactions (#318171); navigator.webdriver defaults to false"
-      print " on controlled views (#165269). Packaged by roojs."
+      print " WebDriver interactions (#318171); navigator.webdriver policy API"
+      print " (#165269, upstream Auto default). Packaged by roojs."
       print " ."
       print " Use system webkitgtk-webdriver for the automation server; link apps"
       print " against this library for Element Click / Send Keys on GTK4."
