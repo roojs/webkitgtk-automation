@@ -66,3 +66,12 @@ build_release_tag() {
   fi
   echo "build-${series}-$(date +%Y%m%d)"
 }
+
+webkit_policy_patch_for_series() {
+  local series="$1" root
+  root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  case "$series" in
+    plucky) echo "$root/patches/webkit-165269-navigator-webdriver-policy-2.50.patch" ;;
+    *) echo "$root/patches/webkit-165269-navigator-webdriver-policy.patch" ;;
+  esac
+}

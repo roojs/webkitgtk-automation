@@ -54,10 +54,6 @@ b/debian/rules	2026-08-17 04:07:26.039385186 +0000
  	WEBDRIVER_DEP_PKG = libwebkitgtk-6.0-4
  endif
  
-+# WebKit #318171: compile INTERACTIONS into libwebkitgtk-6.0.
-+ifeq ($(ENABLE_GTK4),YES)
-+	ENABLE_WEBDRIVER_GTK4 = -DENABLE_WEBDRIVER=ON
-+endif
  # The debhelper files for the soup2, soup3 and gtk4 builds are identical
  # (apart from the API version) so we generate the last two from the first.
  WEBKIT_DH_FILES = \
@@ -127,8 +123,6 @@ b/debian/rules	2026-08-17 04:07:26.039385186 +0000
  		$(ENABLE_WEBDRIVER_SOUP3) -DENABLE_DOCUMENTATION=OFF
  	$(GTK4_BUILD) WK_USE_CCACHE=NO dh_auto_configure -Bbuild-gtk4 -- \
  		$(EXTRA_CMAKE_ARGUMENTS) \
--		$(ENABLE_WEBDRIVER_GTK4)
-+		$(ENABLE_WEBDRIVER_GTK4) \
 +		$(EXTRA_CMAKE_ARGUMENTS_GTK4_VARIANT)
  
  override_dh_auto_build:

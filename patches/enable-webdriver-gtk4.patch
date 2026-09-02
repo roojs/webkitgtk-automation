@@ -49,10 +49,6 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
  	EXTRA_DH_ARGUMENTS += -Nlibwebkitgtk-doc
  endif
  
-+# WebKit #318171: compile INTERACTIONS into libwebkitgtk-6.0.
-+ifeq ($(ENABLE_GTK4),YES)
-+	ENABLE_WEBDRIVER_GTK4 = -DENABLE_WEBDRIVER=ON
-+endif
  # The debhelper files for the gtk3 and gtk4 builds are almost
  # identical so we generate the latter from the former.
  WEBKIT_DH_FILES = \
@@ -118,9 +114,7 @@ b/debian/rules	2026-08-17 04:07:42.303429475 +0000
  		-DENABLE_DOCUMENTATION=OFF -DUSE_GTK4=OFF \
  		$(EXTRA_CMAKE_ARGUMENTS)
  	$(GTK4_BUILD) dh_auto_configure -Bbuild-gtk4 -- \
--		-DENABLE_DOCUMENTATION=$(BUILD_DOCS) -DENABLE_WEBDRIVER=OFF \
-+		-DENABLE_DOCUMENTATION=$(BUILD_DOCS) \
-+		$(ENABLE_WEBDRIVER_GTK4) \
+ 		-DENABLE_DOCUMENTATION=$(BUILD_DOCS) -DENABLE_WEBDRIVER=OFF \
 +		$(EXTRA_CMAKE_ARGUMENTS_GTK4_VARIANT) \
  		$(EXTRA_CMAKE_ARGUMENTS)
  

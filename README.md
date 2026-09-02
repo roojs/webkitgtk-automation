@@ -2,9 +2,7 @@
 
 Rebuild Ubuntu **`libwebkitgtk-6.0-webdriver`** — parallel-install `.deb`s with WebDriver mouse/keyboard/wheel support for GTK4.
 
-Ubuntu’s `debian/rules` enables `-DENABLE_WEBDRIVER=ON` for soup3 (`libwebkit2gtk-4.1`) but leaves it **off** for GTK4 (`libwebkitgtk-6.0`). Browser-side Element Click / Send Keys then return `unsupported operation`. This repo patches that and publishes packages that coexist with system `libwebkitgtk-6.0-4`.
-
-Upstream: [WebKit #318171](https://bugs.webkit.org/show_bug.cgi?id=318171)
+Ubuntu’s GTK4 `libwebkitgtk-6.0` build leaves WebDriver interaction code out of the library, so Element Click / Send Keys return `unsupported operation`. This repo backports upstream fixes ([#318171](https://bugs.webkit.org/show_bug.cgi?id=318171) interactions, [#165269](https://bugs.webkit.org/show_bug.cgi?id=165269) hide `navigator.webdriver`) into parallel-install packages alongside system `libwebkitgtk-6.0-4`.
 
 ## Demonstration
 

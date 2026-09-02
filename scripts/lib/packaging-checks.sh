@@ -15,8 +15,6 @@ assert_patched_rules_markers() {
     return 1
   fi
 
-  grep -q 'ENABLE_WEBDRIVER_GTK4 = -DENABLE_WEBDRIVER=ON' "$rules" \
-    || { echo "error: ENABLE_WEBDRIVER_GTK4 marker missing" >&2; return 1; }
   grep -q 'WEBKITGTK_VARIANT_SUFFIX = -webdriver' "$rules" \
     || { echo "error: WEBKITGTK_VARIANT_SUFFIX marker missing" >&2; return 1; }
   grep -q 'WEBKIT_DH_RENAME_WEBDRIVER' "$rules" \

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Rebuild Ubuntu libwebkitgtk-6.0 with ENABLE_WEBDRIVER for GTK4 (WebKit #318171).
+# Rebuild Ubuntu libwebkitgtk-6.0-webdriver (WebKit #318171 + #165269).
 #
 # Resume / caching:
 #   - Reuses work/<tree> when already prepared (skip fetch/patch).
@@ -48,6 +48,8 @@ fi
 SUFFIX="${SUFFIX:-+webdriver1}"
 PATCH="$(patch_file_for_series "$SERIES")"
 CMAKE_PATCH="$REPO_ROOT/patches/webkitgtk-variant-suffix.patch"
+WEBKIT_INTERACTIONS_PATCH="$REPO_ROOT/patches/webkit-318171-webdriver-interactions.patch"
+WEBKIT_POLICY_PATCH="$(webkit_policy_patch_for_series "$SERIES")"
 COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
 # shellcheck source=scripts/lib/debian-tarball.sh
 source "$REPO_ROOT/scripts/lib/debian-tarball.sh"
@@ -106,6 +108,11 @@ fi
 
 if [[ ! -f "$PATCH" ]]; then
   echo "error: missing patch: $PATCH" >&2
+  exit 1
+fi
+
+if [[ ! -f "$WEBKIT_INTERACTIONS_PATCH" || ! -f "$WEBKIT_POLICY_PATCH" ]]; then
+  echo "error: missing WebKit source patch" >&2
   exit 1
 fi
 
@@ -239,7 +246,8 @@ run_dpkg_buildpackage() {
 
 RULES_PATCH_SHA256="$(sha256sum "$PATCH" | awk '{print $1}')"
 CMAKE_PATCH_SHA256="$(sha256sum "$CMAKE_PATCH" | awk '{print $1}')"
-PATCH_SHA256="$(cat "$PATCH" "$CMAKE_PATCH" | sha256sum | awk '{print $1}')"
+WEBKIT_PATCH_SHA256="$(cat "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" | sha256sum | awk '{print $1}')"
+PATCH_SHA256="$(cat "$PATCH" "$CMAKE_PATCH" "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" | sha256sum | awk '{print $1}')"
 
 apply_rules_patch() {
   echo "==> applying $PATCH"
@@ -262,8 +270,20 @@ revert_cmake_patch_if_applied() {
   fi
 }
 
+apply_source_patch() {
+  local patch="$1"
+  if patch -p1 --dry-run < "$patch" >/dev/null 2>&1; then
+    echo "==> applying $patch"
+    patch -p1 < "$patch"
+  else
+    echo "==> $patch already applied"
+  fi
+}
+
 apply_all_patches() {
   apply_rules_patch
+  apply_source_patch "$WEBKIT_INTERACTIONS_PATCH"
+  apply_source_patch "$WEBKIT_POLICY_PATCH"
   apply_cmake_patch
 }
 
@@ -560,7 +580,7 @@ else
   BASE_VERSION="$(dpkg-parsechangelog -S Version)"
   NEW_VERSION="${BASE_VERSION}${SUFFIX}"
   echo "==> bumping changelog to $NEW_VERSION"
-  dch -v "$NEW_VERSION" "Parallel-install libwebkitgtk-6.0-webdriver with ENABLE_WEBDRIVER (WebKit #318171)."
+  dch -v "$NEW_VERSION" "Parallel-install libwebkitgtk-6.0-webdriver (WebKit #318171 interactions, #165269 navigator.webdriver Disabled)."
   dch -r --distribution "$SERIES" ""
 
   write_marker "$SRC_DIR" prepared
