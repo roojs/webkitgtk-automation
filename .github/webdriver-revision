@@ -3,4 +3,4 @@
 # Next build for a series uses (revision + 1), e.g. 1 -> +webdriver2.
 plucky=3
 questing=3
-resolute=3
+resolute=4
