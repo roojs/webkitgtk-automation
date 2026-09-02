@@ -224,7 +224,7 @@ jobs:
 
       - name: Upload .deb artifacts
         if: ${{ steps.package.outcome == 'success' }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: libwebkitgtk-6.0-${{ env.SERIES }}
           path: dist/*.deb

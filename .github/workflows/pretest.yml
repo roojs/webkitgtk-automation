@@ -63,7 +63,7 @@ jobs:
 
       - name: Upload packaging fixture dump
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: fixture-dump-${{ matrix.series }}
           path: fixture-dump/${{ matrix.series }}/
