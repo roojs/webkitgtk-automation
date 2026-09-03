@@ -3,7 +3,7 @@
  * Use: --pkg=webkitgtk-6.0 --pkg=webkitgtk-webdriver
  */
 
-[CCode (cheader_filename = "WebKitNavigatorWebDriverActivePolicy.h", cprefix = "WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_", type_id = "webkit_navigator_webdriver_active_policy_get_type ()")]
+[CCode (cheader_filename = "WebKitNavigatorWebDriverActivePolicy.h", cname = "WebKitNavigatorWebdriverActivePolicy", cprefix = "WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_", type_id = "webkit_navigator_webdriver_active_policy_get_type ()")]
 namespace WebKit {
     public enum NavigatorWebDriverActivePolicy {
         AUTO,

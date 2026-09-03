@@ -6,7 +6,7 @@
  } WebKitHardwareAccelerationPolicy;
 +
 +/**
-+ * WebKitNavigatorWebDriverActivePolicy:
++ * WebKitNavigatorWebdriverActivePolicy:
 + * @WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_AUTO: Expose %TRUE for %navigator.webdriver when the view is automation-controlled.
 + * @WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_ENABLED: Always expose %TRUE for %navigator.webdriver.
 + * @WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_DISABLED: Always expose %FALSE for %navigator.webdriver, even on automation-controlled views.
@@ -19,7 +19,7 @@
 +    WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_AUTO,
 +    WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_ENABLED,
 +    WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_DISABLED
-+} WebKitNavigatorWebDriverActivePolicy;
++} WebKitNavigatorWebdriverActivePolicy;
  #endif
  
  WEBKIT_API WebKitSettings *
@@ -28,12 +28,12 @@
                                                                  WebKitHardwareAccelerationPolicy policy);
  
 +
-+WEBKIT_API WebKitNavigatorWebDriverActivePolicy
++WEBKIT_API WebKitNavigatorWebdriverActivePolicy
 +webkit_settings_get_navigator_webdriver_active_policy               (WebKitSettings *settings);
 +
 +WEBKIT_API void
 +webkit_settings_set_navigator_webdriver_active_policy               (WebKitSettings *settings,
-+                                                                WebKitNavigatorWebDriverActivePolicy policy);
++                                                                WebKitNavigatorWebdriverActivePolicy policy);
 +
  WEBKIT_API gboolean
  webkit_settings_get_enable_back_forward_navigation_gestures    (WebKitSettings *settings);
@@ -61,7 +61,7 @@
          webkit_settings_set_hardware_acceleration_policy(settings, static_cast<WebKitHardwareAccelerationPolicy>(g_value_get_enum(value)));
          break;
 +    case PROP_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY:
-+        webkit_settings_set_navigator_webdriver_active_policy(settings, static_cast<WebKitNavigatorWebDriverActivePolicy>(g_value_get_enum(value)));
++        webkit_settings_set_navigator_webdriver_active_policy(settings, static_cast<WebKitNavigatorWebdriverActivePolicy>(g_value_get_enum(value)));
 +        break;
      case PROP_ENABLE_BACK_FORWARD_NAVIGATION_GESTURES:
          webkit_settings_set_enable_back_forward_navigation_gestures(settings, g_value_get_boolean(value));
@@ -82,7 +82,7 @@
      /**
 +     * WebKitSettings:navigator-webdriver-active-policy:
 +     *
-+     * The #WebKitNavigatorWebDriverActivePolicy controlling whether page JavaScript
++     * The #WebKitNavigatorWebdriverActivePolicy controlling whether page JavaScript
 +     * sees W3C %navigator.webdriver as %TRUE on automation-controlled views.
 +     *
 +     * Since: 2.52
@@ -111,28 +111,28 @@
 + *
 + * Get the #WebKitSettings:navigator-webdriver-active-policy property.
 + *
-+ * Return: a #WebKitNavigatorWebDriverActivePolicy
++ * Return: a #WebKitNavigatorWebdriverActivePolicy
 + *
 + * Since: 2.52
 + */
-+WebKitNavigatorWebDriverActivePolicy webkit_settings_get_navigator_webdriver_active_policy(WebKitSettings* settings)
++WebKitNavigatorWebdriverActivePolicy webkit_settings_get_navigator_webdriver_active_policy(WebKitSettings* settings)
 +{
 +    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_AUTO);
 +
 +    WebKitSettingsPrivate* priv = settings->priv;
-+    return static_cast<WebKitNavigatorWebDriverActivePolicy>(static_cast<WebCore::NavigatorWebDriverActivePolicy>(priv->preferences->navigatorWebDriverActivePolicy()));
++    return static_cast<WebKitNavigatorWebdriverActivePolicy>(static_cast<WebCore::NavigatorWebDriverActivePolicy>(priv->preferences->navigatorWebDriverActivePolicy()));
 +}
 +
 +/**
 + * webkit_settings_set_navigator_webdriver_active_policy:
 + * @settings: a #WebKitSettings
-+ * @policy: a #WebKitNavigatorWebDriverActivePolicy
++ * @policy: a #WebKitNavigatorWebdriverActivePolicy
 + *
 + * Set the #WebKitSettings:navigator-webdriver-active-policy property.
 + *
 + * Since: 2.52
 + */
-+void webkit_settings_set_navigator_webdriver_active_policy(WebKitSettings* settings, WebKitNavigatorWebDriverActivePolicy policy)
++void webkit_settings_set_navigator_webdriver_active_policy(WebKitSettings* settings, WebKitNavigatorWebdriverActivePolicy policy)
 +{
 +    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
 +

@@ -252,8 +252,8 @@ run_dpkg_buildpackage() {
 
 RULES_PATCH_SHA256="$(sha256sum "$PATCH" | awk '{print $1}')"
 CMAKE_PATCH_SHA256="$(sha256sum "$CMAKE_PATCH" | awk '{print $1}')"
-WEBKIT_PATCH_SHA256="$(cat "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" "$WEBKIT_INVISIBLE_PATCH" | sha256sum | awk '{print $1}')"
-PATCH_SHA256="$(cat "$PATCH" "$CMAKE_PATCH" "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" "$WEBKIT_INVISIBLE_PATCH" | sha256sum | awk '{print $1}')"
+WEBKIT_PATCH_SHA256="$(cat "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" "$WEBKIT_GTK_API_PATCH" "$WEBKIT_INVISIBLE_PATCH" | sha256sum | awk '{print $1}')"
+PATCH_SHA256="$(cat "$PATCH" "$CMAKE_PATCH" "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" "$WEBKIT_GTK_API_PATCH" "$WEBKIT_INVISIBLE_PATCH" | sha256sum | awk '{print $1}')"
 
 apply_rules_patch() {
   echo "==> applying $PATCH"
@@ -339,6 +339,13 @@ marker_cmake_patch_sha256() {
   awk -F= '/^CMAKE_PATCH_SHA256=/ { print $2; exit }' "$marker"
 }
 
+marker_webkit_patch_sha256() {
+  local src="$1"
+  local marker="$src/$MARKER_NAME"
+  [[ -f "$marker" ]] || return 1
+  awk -F= '/^WEBKIT_PATCH_SHA256=/ { print $2; exit }' "$marker"
+}
+
 marker_stage() {
   local src="$1"
   local marker="$src/$MARKER_NAME"
@@ -356,6 +363,7 @@ COMPILE_CACHE_KEY=$COMPILE_CACHE_KEY
 PATCH_SHA256=$PATCH_SHA256
 RULES_PATCH_SHA256=$RULES_PATCH_SHA256
 CMAKE_PATCH_SHA256=$CMAKE_PATCH_SHA256
+WEBKIT_PATCH_SHA256=$WEBKIT_PATCH_SHA256
 STAGE=$stage
 PREPARED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
@@ -474,6 +482,15 @@ marker_matches() {
 }
 
 SRC_DIR="$(find_src_dir)"
+if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]] && marker_matches "$SRC_DIR"; then
+  stored_webkit="$(marker_webkit_patch_sha256 "$SRC_DIR" || true)"
+  if [[ -n "$stored_webkit" && "$stored_webkit" != "$WEBKIT_PATCH_SHA256" ]]; then
+    echo "==> webkit source patches changed; refreshing work dir"
+    rm -rf "$WORK_DIR"
+    mkdir -p "$WORK_DIR"
+    SRC_DIR=""
+  fi
+fi
 RESUME=0
 RULES_REFRESHED=0
 CMAKE_REFRESHED=0
