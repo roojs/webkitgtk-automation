@@ -1,0 +1,42 @@
+--- a/Source/WebCore/Modules/webdriver/Navigator+WebDriver.idl
++++ b/Source/WebCore/Modules/webdriver/Navigator+WebDriver.idl
+@@ -25,7 +25,8 @@
+ 
+ // https://w3c.github.io/webdriver/#interface
+ [
+-    ImplementedBy=NavigatorWebDriver
++    ImplementedBy=NavigatorWebDriver,
++    EnabledBySetting=NavigatorWebDriverJavaScriptAttributeEnabled
+ ] partial interface Navigator {
+     readonly attribute boolean webdriver;
+ };
+--- a/Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp
++++ b/Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp
+@@ -4059,6 +4059,7 @@
+         return;
+ 
+     priv->preferences->setNavigatorWebDriverActivePolicy(webCorePolicy);
++    priv->preferences->setNavigatorWebDriverJavaScriptAttributeEnabled(webCorePolicy != WebCore::NavigatorWebDriverActivePolicy::Disabled);
+     g_object_notify_by_pspec(G_OBJECT(settings), sObjProperties[PROP_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY]);
+ }
+ 
+--- a/Source/WTF/Scripts/Preferences/UnifiedWebPreferences.yaml
++++ b/Source/WTF/Scripts/Preferences/UnifiedWebPreferences.yaml
+@@ -5709,6 +5709,17 @@
+     WebCore:
+       default: NavigatorWebDriverActivePolicy::Auto
+ 
++NavigatorWebDriverJavaScriptAttributeEnabled:
++  type: bool
++  status: embedder
++  defaultValue:
++    WebKitLegacy:
++      default: true
++    WebKit:
++      default: true
++    WebCore:
++      default: true
++
+ NeedsAdobeFrameReloadingQuirk:
+   comment: 'FIXME: This quirk is needed because of Radar 4674537 and 5211271. We need
+     to phase it out once Adobe can fix the bug from their end.'

@@ -71,10 +71,8 @@ echo "==> applying for real (temp tree only) to confirm"
 
 echo "==> linker smoke check (gold)"
 if ! command -v ld.gold >/dev/null 2>&1; then
-  echo "==> installing binutils-gold for smoke check"
-  sudo apt-get install -y binutils-gold
-fi
-if command -v cc >/dev/null 2>&1 && command -v ld.gold >/dev/null 2>&1; then
+  echo "warning: ld.gold not installed; skipping gold link smoke (CI installs binutils-gold)" >&2
+elif command -v cc >/dev/null 2>&1 && command -v ld.gold >/dev/null 2>&1; then
   grep -q 'fuse-ld=gold' "$TMP/src/debian/rules"
   echo 'int main(void){return 0;}' | cc -x c - -fuse-ld=gold -o "$TMP/linktest"
   echo "==> gold link smoke OK ($TMP/linktest)"

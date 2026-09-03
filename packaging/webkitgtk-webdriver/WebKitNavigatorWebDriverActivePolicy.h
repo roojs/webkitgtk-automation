@@ -16,7 +16,7 @@ G_BEGIN_DECLS
  * WebKitNavigatorWebDriverActivePolicy:
  * @WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_AUTO: Expose %TRUE for %navigator.webdriver when automation-controlled.
  * @WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_ENABLED: Always expose %TRUE for %navigator.webdriver.
- * @WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_DISABLED: Always expose %FALSE for %navigator.webdriver.
+ * @WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_DISABLED: Omit %navigator.webdriver from page JavaScript (invisible; not %FALSE).
  */
 typedef enum {
     WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_AUTO,

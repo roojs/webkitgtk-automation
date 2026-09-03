@@ -24,6 +24,7 @@ Source/cmake/OptionsGTK.cmake
 Source/WebKit/PlatformGTK.cmake
 Source/WebCore/Headers.cmake
 Source/WebCore/Modules/webdriver/NavigatorWebDriver.cpp
+Source/WebCore/Modules/webdriver/Navigator+WebDriver.idl
 Source/WebCore/page/SettingsBase.h
 Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp
 Source/WebKit/UIProcess/API/glib/WebKitSettings.h.in

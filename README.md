@@ -9,6 +9,7 @@ This is not a fork of WebKit. It is Ubuntu’s `webkit2gtk` source with:
 | `webkit-318171-webdriver-interactions.patch` | [#318171](https://bugs.webkit.org/show_bug.cgi?id=318171) | Compiles WebDriver mouse/keyboard/wheel interaction code into `libwebkitgtk-6.0` without turning on full `ENABLE_WEBDRIVER`. |
 | `webkit-165269-navigator-webdriver-policy*.patch` | [#165269](https://bugs.webkit.org/show_bug.cgi?id=165269) | Backports `NavigatorWebDriverActivePolicy` so embedders can hide `navigator.webdriver` (upstream **Auto** default). |
 | `webkit-165269-navigator-webdriver-gtk-api.patch` | [#165269](https://bugs.webkit.org/show_bug.cgi?id=165269) | Exposes `WebKitSettings:navigator-webdriver-active-policy` on GTK (+ thin Vala vapi in `-dev`). |
+| `webkit-165269-navigator-webdriver-invisible*.patch` | (package-only) | With policy **Disabled**, omits `navigator.webdriver` from page JS (Chromium `AutomationControlled` parity). Policy default stays upstream **Auto**. |
 
 Packaging patches (`enable-webdriver-gtk4*.patch`, `webkitgtk-variant-suffix.patch`) rename the GTK4 stack to `libwebkitgtk-6.0-webdriver`, skip duplicate JSC/WebDriver binaries, and tune the build for CI. System `libwebkitgtk-6.0-4`, `libjavascriptcoregtk-6.0-1`, and `webkitgtk-webdriver` stay installed.
 
@@ -57,25 +58,25 @@ Chromium on Windows lets embedders opt out: launch with `--disable-blink-feature
 |--------|------------------------------------------|
 | **Auto** (upstream default) | `true` when the view is automation-controlled |
 | **Enabled** | always `true` |
-| **Disabled** | always `false`, even when automation-controlled |
+| **Disabled** (stock upstream) | always `false`, even when automation-controlled |
+| **Disabled** (this package) | property **absent** (`undefined` / `'webdriver' in navigator === false`) |
 
 ### What this package does
 
-The `#165269` patch is applied with upstream’s **Auto** default — the same as stock WebKit once the policy API is present. Installing `libwebkitgtk-6.0-webdriver4` does **not** hide the flag by itself:
+The `#165269` policy patch keeps upstream’s **Auto** default. A **package-only invisible patch** changes what **Disabled** means: instead of `navigator.webdriver === false`, the property is **absent** from page JavaScript (Chromium `--disable-blink-features=AutomationControlled` parity).
 
 - WebDriver Element Click, Send Keys, and wheel work (the `#318171` interactions are in the library).
-- On a controlled view, page JavaScript still sees `navigator.webdriver === true` unless your app sets the policy to **Disabled**.
+- With default **Auto** on a controlled view, page JavaScript sees `navigator.webdriver === true` (same as stock WebKit).
+- Set `WebKitSettings:navigator-webdriver-active-policy` to **Disabled** to hide the property before attaching settings to a controlled view.
 
-To hide the flag (Chromium `AutomationControlled`–style), set `WebKitSettings:navigator-webdriver-active-policy` to **Disabled** before attaching settings to a controlled view.
-
-**Vala:**
+**Vala** (hide automation signal):
 
 ```vala
 var settings = new WebKit.Settings ();
 settings.navigator_webdriver_active_policy = WebKit.NavigatorWebDriverActivePolicy.DISABLED;
 ```
 
-**C:**
+**C**:
 
 ```c
 #include <WebKitNavigatorWebDriverActivePolicy.h>
@@ -89,7 +90,7 @@ Use automation as usual:
 1. Keep system `webkitgtk-webdriver` for the `WebKitWebDriver` process.
 2. Build/link the embedded browser against `webkitgtk-6.0-webdriver` (Meson: `-Dwebkit_pc=webkitgtk-6.0-webdriver` or `dependency('webkitgtk-6.0-webdriver')`).
 3. Create the view with `is-controlled-by-automation: true` when driving it through WebDriver.
-4. If you need `navigator.webdriver === false`, set `navigator-webdriver-active-policy` to **Disabled** on the view’s `WebKitSettings`.
+4. To hide `navigator.webdriver`, set `navigator-webdriver-active-policy` to **Disabled** on the view’s `WebKitSettings` before load.
 
 ### Verify
 
@@ -99,10 +100,11 @@ In a controlled session, open the developer console and run:
 navigator.webdriver
 ```
 
-With default **Auto** policy (this package, no embedder override): expect `true`. After setting policy **Disabled**: expect `false`.
+With default **Auto** on a controlled view: expect `true`. After setting policy **Disabled**: expect `undefined`, and `'webdriver' in navigator` is `false`.
 
 ## Documentation
 
+- [Changelog](CHANGELOG.md) — **+webdriverN** releases and included patches per Ubuntu series
 - [Building locally](docs/building.md) — `./build.sh`, resume/caching, pretest
 - [CI builds](docs/ci.md) — GitHub Actions tags and workflows
 - [Repo layout](docs/layout.md) — paths and roles

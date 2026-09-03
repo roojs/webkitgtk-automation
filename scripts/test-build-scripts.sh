@@ -13,7 +13,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PRETEST_FAST="${PRETEST_FAST:-0}"
 COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
 # Keep in sync with .github/compile-cache-key when bumping the cache version.
-EXPECTED_COMPILE_CACHE_KEY="v10"
+EXPECTED_COMPILE_CACHE_KEY="v12"
 MARKER_NAME=".webkitgtk-automation-prepared"
 # shellcheck source=scripts/lib/debian-tarball.sh
 source "$REPO_ROOT/scripts/lib/debian-tarball.sh"

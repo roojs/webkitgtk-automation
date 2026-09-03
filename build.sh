@@ -50,6 +50,7 @@ PATCH="$(patch_file_for_series "$SERIES")"
 CMAKE_PATCH="$REPO_ROOT/patches/webkitgtk-variant-suffix.patch"
 WEBKIT_INTERACTIONS_PATCH="$REPO_ROOT/patches/webkit-318171-webdriver-interactions.patch"
 WEBKIT_POLICY_PATCH="$(webkit_policy_patch_for_series "$SERIES")"
+WEBKIT_INVISIBLE_PATCH="$(webkit_invisible_patch_for_series "$SERIES")"
 WEBKIT_GTK_API_PATCH="$REPO_ROOT/patches/webkit-165269-navigator-webdriver-gtk-api.patch"
 COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
 # shellcheck source=scripts/lib/debian-tarball.sh
@@ -116,8 +117,8 @@ if [[ ! -f "$WEBKIT_INTERACTIONS_PATCH" || ! -f "$WEBKIT_POLICY_PATCH" ]]; then
   echo "error: missing WebKit source patch" >&2
   exit 1
 fi
-if [[ ! -f "$WEBKIT_GTK_API_PATCH" ]]; then
-  echo "error: missing WebKit GTK API patch: $WEBKIT_GTK_API_PATCH" >&2
+if [[ ! -f "$WEBKIT_GTK_API_PATCH" || ! -f "$WEBKIT_INVISIBLE_PATCH" ]]; then
+  echo "error: missing WebKit GTK/invisible patch" >&2
   exit 1
 fi
 
@@ -251,8 +252,8 @@ run_dpkg_buildpackage() {
 
 RULES_PATCH_SHA256="$(sha256sum "$PATCH" | awk '{print $1}')"
 CMAKE_PATCH_SHA256="$(sha256sum "$CMAKE_PATCH" | awk '{print $1}')"
-WEBKIT_PATCH_SHA256="$(cat "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" | sha256sum | awk '{print $1}')"
-PATCH_SHA256="$(cat "$PATCH" "$CMAKE_PATCH" "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" | sha256sum | awk '{print $1}')"
+WEBKIT_PATCH_SHA256="$(cat "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" "$WEBKIT_INVISIBLE_PATCH" | sha256sum | awk '{print $1}')"
+PATCH_SHA256="$(cat "$PATCH" "$CMAKE_PATCH" "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" "$WEBKIT_INVISIBLE_PATCH" | sha256sum | awk '{print $1}')"
 
 apply_rules_patch() {
   echo "==> applying $PATCH"
@@ -290,6 +291,7 @@ apply_all_patches() {
   apply_source_patch "$WEBKIT_INTERACTIONS_PATCH"
   apply_source_patch "$WEBKIT_POLICY_PATCH"
   apply_source_patch "$WEBKIT_GTK_API_PATCH"
+  apply_source_patch "$WEBKIT_INVISIBLE_PATCH"
   apply_cmake_patch
 }
 
