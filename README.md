@@ -8,6 +8,7 @@ This is not a fork of WebKit. It is Ubuntu’s `webkit2gtk` source with:
 |-------|----------|--------------|
 | `webkit-318171-webdriver-interactions.patch` | [#318171](https://bugs.webkit.org/show_bug.cgi?id=318171) | Compiles WebDriver mouse/keyboard/wheel interaction code into `libwebkitgtk-6.0` without turning on full `ENABLE_WEBDRIVER`. |
 | `webkit-165269-navigator-webdriver-policy*.patch` | [#165269](https://bugs.webkit.org/show_bug.cgi?id=165269) | Backports `NavigatorWebDriverActivePolicy` so embedders can hide `navigator.webdriver` (upstream **Auto** default). |
+| `webkit-165269-navigator-webdriver-gtk-api.patch` | [#165269](https://bugs.webkit.org/show_bug.cgi?id=165269) | Exposes `WebKitSettings:navigator-webdriver-active-policy` on GTK (+ thin Vala vapi in `-dev`). |
 
 Packaging patches (`enable-webdriver-gtk4*.patch`, `webkitgtk-variant-suffix.patch`) rename the GTK4 stack to `libwebkitgtk-6.0-webdriver`, skip duplicate JSC/WebDriver binaries, and tune the build for CI. System `libwebkitgtk-6.0-4`, `libjavascriptcoregtk-6.0-1`, and `webkitgtk-webdriver` stay installed.
 
@@ -36,7 +37,7 @@ sudo apt update
 sudo apt install libwebkitgtk-6.0-webdriver4 libwebkitgtk-6.0-webdriver-dev
 ```
 
-Keep system `libwebkitgtk-6.0-4`, `libjavascriptcoregtk-6.0-1`, and `webkitgtk-webdriver` installed. Meson consumers: `dependency('webkitgtk-6.0-webdriver')` (Vala still uses `--pkg=webkitgtk-6.0` for API).
+Keep system `libwebkitgtk-6.0-4`, `libjavascriptcoregtk-6.0-1`, and `webkitgtk-webdriver` installed. Meson consumers: `dependency('webkitgtk-6.0-webdriver')`. Vala: `--pkg=webkitgtk-6.0 --pkg=webkitgtk-webdriver`.
 
 To remove:
 
@@ -65,14 +66,30 @@ The `#165269` patch is applied with upstream’s **Auto** default — the same a
 - WebDriver Element Click, Send Keys, and wheel work (the `#318171` interactions are in the library).
 - On a controlled view, page JavaScript still sees `navigator.webdriver === true` unless your app sets the policy to **Disabled**.
 
-To hide the flag (Chromium `AutomationControlled`–style), the embedder must set `NavigatorWebDriverActivePolicy` to **Disabled** for that view’s settings. GTK does not yet ship a public `WebKitSettings` property for this (Cocoa has private SPI: `-[WKPreferences _setNavigatorWebDriverActivePolicy:]`). Until GTK exposes it, consumers need their own wiring into WebCore settings or must wait for upstream API.
+To hide the flag (Chromium `AutomationControlled`–style), set `WebKitSettings:navigator-webdriver-active-policy` to **Disabled** before attaching settings to a controlled view.
+
+**Vala:**
+
+```vala
+var settings = new WebKit.Settings ();
+settings.navigator_webdriver_active_policy = WebKit.NavigatorWebDriverActivePolicy.DISABLED;
+```
+
+**C:**
+
+```c
+#include <WebKitNavigatorWebDriverActivePolicy.h>
+
+webkit_settings_set_navigator_webdriver_active_policy (
+    settings, WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_DISABLED);
+```
 
 Use automation as usual:
 
 1. Keep system `webkitgtk-webdriver` for the `WebKitWebDriver` process.
 2. Build/link the embedded browser against `webkitgtk-6.0-webdriver` (Meson: `-Dwebkit_pc=webkitgtk-6.0-webdriver` or `dependency('webkitgtk-6.0-webdriver')`).
 3. Create the view with `is-controlled-by-automation: true` when driving it through WebDriver.
-4. If you need `navigator.webdriver === false`, set policy **Disabled** on the view (once your stack can reach that setting).
+4. If you need `navigator.webdriver === false`, set `navigator-webdriver-active-policy` to **Disabled** on the view’s `WebKitSettings`.
 
 ### Verify
 

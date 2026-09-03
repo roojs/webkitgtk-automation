@@ -31,8 +31,8 @@ rewrite_webdriver_packaging_metadata() {
       print " against this library for Element Click / Send Keys on GTK4."
     }
     function print_dev_body() {
-      print " Ships webkitgtk-6.0-webdriver.pc only. API headers and vapi come from"
-      print " system libwebkitgtk-6.0-dev and libjavascriptcoregtk-6.0-dev."
+      print " Ships webkitgtk-6.0-webdriver.pc plus navigator.webdriver GTK extension"
+      print " header/vapi. Base WebKitGTK API comes from system libwebkitgtk-6.0-dev."
     }
     function skip_description_body(    line) {
       while ((getline line) > 0) {

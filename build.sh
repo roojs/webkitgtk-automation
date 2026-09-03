@@ -50,6 +50,7 @@ PATCH="$(patch_file_for_series "$SERIES")"
 CMAKE_PATCH="$REPO_ROOT/patches/webkitgtk-variant-suffix.patch"
 WEBKIT_INTERACTIONS_PATCH="$REPO_ROOT/patches/webkit-318171-webdriver-interactions.patch"
 WEBKIT_POLICY_PATCH="$(webkit_policy_patch_for_series "$SERIES")"
+WEBKIT_GTK_API_PATCH="$REPO_ROOT/patches/webkit-165269-navigator-webdriver-gtk-api.patch"
 COMPILE_CACHE_KEY_FILE="$REPO_ROOT/.github/compile-cache-key"
 # shellcheck source=scripts/lib/debian-tarball.sh
 source "$REPO_ROOT/scripts/lib/debian-tarball.sh"
@@ -113,6 +114,10 @@ fi
 
 if [[ ! -f "$WEBKIT_INTERACTIONS_PATCH" || ! -f "$WEBKIT_POLICY_PATCH" ]]; then
   echo "error: missing WebKit source patch" >&2
+  exit 1
+fi
+if [[ ! -f "$WEBKIT_GTK_API_PATCH" ]]; then
+  echo "error: missing WebKit GTK API patch: $WEBKIT_GTK_API_PATCH" >&2
   exit 1
 fi
 
@@ -284,7 +289,16 @@ apply_all_patches() {
   apply_rules_patch
   apply_source_patch "$WEBKIT_INTERACTIONS_PATCH"
   apply_source_patch "$WEBKIT_POLICY_PATCH"
+  apply_source_patch "$WEBKIT_GTK_API_PATCH"
   apply_cmake_patch
+}
+
+stage_webdriver_dev_bindings() {
+  local src="$1"
+  mkdir -p "$src/debian/webkitgtk-webdriver"
+  cp "$REPO_ROOT/packaging/webkitgtk-webdriver/WebKitNavigatorWebDriverActivePolicy.h" \
+    "$REPO_ROOT/packaging/webkitgtk-webdriver/webkitgtk-webdriver.vapi" \
+    "$src/debian/webkitgtk-webdriver/"
 }
 
 ensure_debian_control() {
@@ -571,6 +585,7 @@ else
   echo "==> source tree: $SRC_DIR"
 
   apply_all_patches
+  stage_webdriver_dev_bindings "$SRC_DIR"
 
   BASE_VERSION="$(dpkg-parsechangelog -S Version)"
   NEW_VERSION="${BASE_VERSION}${SUFFIX}"
@@ -587,6 +602,7 @@ if [[ "$RULES_REFRESHED" == "1" ]]; then
   drop_stale_packaging_files_after_rules_refresh
 fi
 
+stage_webdriver_dev_bindings "$SRC_DIR"
 ensure_debian_control
 
 post_prepare_build_state() {

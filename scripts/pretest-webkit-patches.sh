@@ -17,6 +17,7 @@ SERIES="${SERIES:-resolute}"
 PINNED_WEBKIT_VERSION="$(read_pinned_webkit_version "$SERIES")"
 WEBKIT_INTERACTIONS_PATCH="$REPO_ROOT/patches/webkit-318171-webdriver-interactions.patch"
 WEBKIT_POLICY_PATCH="$(webkit_policy_patch_for_series "$SERIES")"
+WEBKIT_GTK_API_PATCH="$REPO_ROOT/patches/webkit-165269-navigator-webdriver-gtk-api.patch"
 CMAKE_PATCH="$REPO_ROOT/patches/webkitgtk-variant-suffix.patch"
 
 if ! webkit_source_fixture_ready "$SERIES" "$PINNED_WEBKIT_VERSION"; then
@@ -32,7 +33,7 @@ trap cleanup EXIT
 cp -a "$(webkit_source_fixture_dir "$SERIES")/." "$TMP/"
 cd "$TMP"
 
-for patch in "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" "$CMAKE_PATCH"; do
+for patch in "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" "$WEBKIT_GTK_API_PATCH" "$CMAKE_PATCH"; do
   echo "==> dry-run $patch"
   patch -p1 --dry-run < "$patch"
 done

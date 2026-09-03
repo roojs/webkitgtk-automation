@@ -75,7 +75,7 @@
  	sed -i '$${/^$$/d}' debian/control # Remove last empty line
  
  override_dh_gencontrol:
-@@ -245,30 +271,66 @@
+@@ -245,30 +271,68 @@
  	if [ "$(ENABLE_GTK4)" = "YES" ]; then \
  		for src in $(WEBKIT_DH_FILES); do \
  			dst=`echo $$src | $(WEBKIT_DH_RENAME_GTK4)` ; \
@@ -97,11 +97,13 @@
 +		echo 'Name: webkitgtk-6.0-webdriver'; \
 +		echo 'Description: WebKitGTK 6.0 with WebDriver interactions (parallel install)'; \
 +		echo 'Version: $(shell dpkg-parsechangelog -S Version)'; \
-+		echo 'Requires: gtk4, libsoup-3.0, javascriptcoregtk-6.0'; \
++		echo 'Requires: webkitgtk-6.0, gtk4, libsoup-3.0, javascriptcoregtk-6.0'; \
 +		echo 'Libs: -L$${libdir} -l:libwebkitgtk-6.0-webdriver.so.4'; \
-+		echo 'Cflags: -I$${includedir}/webkitgtk-6.0'; \
++		echo 'Cflags: -I$${includedir}/webkitgtk-6.0 -I$${includedir}/webkitgtk-webdriver-6.0'; \
 +	} > debian/webkitgtk-6.0-webdriver.pc
 +	echo 'debian/webkitgtk-6.0-webdriver.pc usr/lib/$(DEB_HOST_MULTIARCH)/pkgconfig/' > debian/libwebkitgtk-6.0-webdriver-dev.install
++	echo 'debian/webkitgtk-webdriver/WebKitNavigatorWebDriverActivePolicy.h usr/include/webkitgtk-webdriver-6.0/' >> debian/libwebkitgtk-6.0-webdriver-dev.install
++	echo 'debian/webkitgtk-webdriver/webkitgtk-webdriver.vapi usr/share/vala/vapi/' >> debian/libwebkitgtk-6.0-webdriver-dev.install
 +	echo debian/webkitgtk-6.0-webdriver.pc >> debian/clean
  	$(GTK3_BUILD) dh_auto_configure -Bbuild-gtk3 -- \
  		-DENABLE_DOCUMENTATION=OFF -DUSE_GTK4=OFF \

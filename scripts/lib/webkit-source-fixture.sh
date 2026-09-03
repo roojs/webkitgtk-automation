@@ -25,6 +25,8 @@ Source/WebKit/PlatformGTK.cmake
 Source/WebCore/Headers.cmake
 Source/WebCore/Modules/webdriver/NavigatorWebDriver.cpp
 Source/WebCore/page/SettingsBase.h
+Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp
+Source/WebKit/UIProcess/API/glib/WebKitSettings.h.in
 Source/WTF/Scripts/Preferences/UnifiedWebPreferences.yaml
 EOF
 }
