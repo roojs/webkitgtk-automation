@@ -1,0 +1,150 @@
+--- a/Source/WebKit/UIProcess/API/glib/WebKitSettings.h.in	2026-02-23 22:40:56.460295200 +0800
++++ b/Source/WebKit/UIProcess/API/glib/WebKitSettings.h.in	2026-09-03 08:28:49.266740930 +0800
+@@ -89,6 +89,22 @@
+     WEBKIT_HARDWARE_ACCELERATION_POLICY_ALWAYS,
+     WEBKIT_HARDWARE_ACCELERATION_POLICY_NEVER
+ } WebKitHardwareAccelerationPolicy;
++
++/**
++ * WebKitNavigatorWebDriverActivePolicy:
++ * @WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_AUTO: Expose %TRUE for %navigator.webdriver when the view is automation-controlled.
++ * @WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_ENABLED: Always expose %TRUE for %navigator.webdriver.
++ * @WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_DISABLED: Always expose %FALSE for %navigator.webdriver, even on automation-controlled views.
++ *
++ * Enum values used to control whether page JavaScript sees W3C %navigator.webdriver.
++ *
++ * Since: 2.52
++ */
++typedef enum {
++    WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_AUTO,
++    WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_ENABLED,
++    WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_DISABLED
++} WebKitNavigatorWebDriverActivePolicy;
+ #endif
+ 
+ WEBKIT_API WebKitSettings *
+@@ -506,6 +522,14 @@
+ webkit_settings_set_hardware_acceleration_policy               (WebKitSettings *settings,
+                                                                 WebKitHardwareAccelerationPolicy policy);
+ 
++
++WEBKIT_API WebKitNavigatorWebDriverActivePolicy
++webkit_settings_get_navigator_webdriver_active_policy               (WebKitSettings *settings);
++
++WEBKIT_API void
++webkit_settings_set_navigator_webdriver_active_policy               (WebKitSettings *settings,
++                                                                WebKitNavigatorWebDriverActivePolicy policy);
++
+ WEBKIT_API gboolean
+ webkit_settings_get_enable_back_forward_navigation_gestures    (WebKitSettings *settings);
+ 
+--- a/Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp	2026-03-25 18:23:21.923028700 +0800
++++ b/Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp	2026-09-03 08:28:49.326038416 +0800
+@@ -47,6 +47,7 @@
+ #include <wtf/glib/WTFGType.h>
+ #include <wtf/text/CStringView.h>
+ 
++#include <WebCore/NavigatorWebDriverActivePolicy.h>
+ #if PLATFORM(GTK)
+ #include "HardwareAccelerationManager.h"
+ #endif
+@@ -184,6 +185,7 @@
+     PROP_ALLOW_TOP_NAVIGATION_TO_DATA_URLS,
+ #if PLATFORM(GTK)
+     PROP_HARDWARE_ACCELERATION_POLICY,
++    PROP_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY,
+     PROP_ENABLE_BACK_FORWARD_NAVIGATION_GESTURES,
+ #endif
+     PROP_ENABLE_JAVASCRIPT_MARKUP,
+@@ -405,6 +407,9 @@
+     case PROP_HARDWARE_ACCELERATION_POLICY:
+         webkit_settings_set_hardware_acceleration_policy(settings, static_cast<WebKitHardwareAccelerationPolicy>(g_value_get_enum(value)));
+         break;
++    case PROP_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY:
++        webkit_settings_set_navigator_webdriver_active_policy(settings, static_cast<WebKitNavigatorWebDriverActivePolicy>(g_value_get_enum(value)));
++        break;
+     case PROP_ENABLE_BACK_FORWARD_NAVIGATION_GESTURES:
+         webkit_settings_set_enable_back_forward_navigation_gestures(settings, g_value_get_boolean(value));
+         break;
+@@ -622,6 +627,9 @@
+     case PROP_HARDWARE_ACCELERATION_POLICY:
+         g_value_set_enum(value, webkit_settings_get_hardware_acceleration_policy(settings));
+         break;
++    case PROP_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY:
++        g_value_set_enum(value, webkit_settings_get_navigator_webdriver_active_policy(settings));
++        break;
+     case PROP_ENABLE_BACK_FORWARD_NAVIGATION_GESTURES:
+         g_value_set_boolean(value, webkit_settings_get_enable_back_forward_navigation_gestures(settings));
+         break;
+@@ -1610,6 +1618,23 @@
+             readWriteConstructParamFlags);
+ 
+     /**
++     * WebKitSettings:navigator-webdriver-active-policy:
++     *
++     * The #WebKitNavigatorWebDriverActivePolicy controlling whether page JavaScript
++     * sees W3C %navigator.webdriver as %TRUE on automation-controlled views.
++     *
++     * Since: 2.52
++     */
++    sObjProperties[PROP_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY] =
++        g_param_spec_enum(
++            "navigator-webdriver-active-policy",
++            _("Navigator WebDriver Active Policy"),
++            _("Policy controlling navigator.webdriver exposure to page JavaScript"),
++            WEBKIT_TYPE_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY,
++            WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_AUTO,
++            readWriteConstructParamFlags);
++
++    /**
+      * WebKitSettings:enable-back-forward-navigation-gestures:
+      *
+      * Enable or disable horizontal swipe gesture for back-forward navigation.
+@@ -3996,6 +4021,47 @@
+         g_object_notify_by_pspec(G_OBJECT(settings), sObjProperties[PROP_HARDWARE_ACCELERATION_POLICY]);
+ }
+ 
++
++/**
++ * webkit_settings_get_navigator_webdriver_active_policy:
++ * @settings: a #WebKitSettings
++ *
++ * Get the #WebKitSettings:navigator-webdriver-active-policy property.
++ *
++ * Return: a #WebKitNavigatorWebDriverActivePolicy
++ *
++ * Since: 2.52
++ */
++WebKitNavigatorWebDriverActivePolicy webkit_settings_get_navigator_webdriver_active_policy(WebKitSettings* settings)
++{
++    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_AUTO);
++
++    WebKitSettingsPrivate* priv = settings->priv;
++    return static_cast<WebKitNavigatorWebDriverActivePolicy>(priv->preferences->navigatorWebDriverActivePolicy());
++}
++
++/**
++ * webkit_settings_set_navigator_webdriver_active_policy:
++ * @settings: a #WebKitSettings
++ * @policy: a #WebKitNavigatorWebDriverActivePolicy
++ *
++ * Set the #WebKitSettings:navigator-webdriver-active-policy property.
++ *
++ * Since: 2.52
++ */
++void webkit_settings_set_navigator_webdriver_active_policy(WebKitSettings* settings, WebKitNavigatorWebDriverActivePolicy policy)
++{
++    g_return_if_fail(WEBKIT_IS_SETTINGS(settings));
++
++    WebKitSettingsPrivate* priv = settings->priv;
++    auto webCorePolicy = static_cast<WebCore::NavigatorWebDriverActivePolicy>(policy);
++    if (priv->preferences->navigatorWebDriverActivePolicy() == webCorePolicy)
++        return;
++
++    priv->preferences->setNavigatorWebDriverActivePolicy(webCorePolicy);
++    g_object_notify_by_pspec(G_OBJECT(settings), sObjProperties[PROP_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY]);
++}
++
+ /**
+  * webkit_settings_get_enable_back_forward_navigation_gestures:
+  * @settings: a #WebKitSettings
