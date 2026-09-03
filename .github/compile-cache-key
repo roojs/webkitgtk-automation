@@ -10,4 +10,4 @@
 #
 # Work-cache entries from failed runs are only saved when build-gtk4/ is
 # resumable (see scripts/lib/gtk4-build-state.sh); corrupt trees are not packed.
-v12
+v13

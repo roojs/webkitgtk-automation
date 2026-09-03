@@ -15,7 +15,7 @@
 @@ -4059,6 +4059,7 @@
          return;
  
-     priv->preferences->setNavigatorWebDriverActivePolicy(webCorePolicy);
+     priv->preferences->setNavigatorWebDriverActivePolicy(static_cast<uint32_t>(webCorePolicy));
 +    priv->preferences->setNavigatorWebDriverJavaScriptAttributeEnabled(webCorePolicy != WebCore::NavigatorWebDriverActivePolicy::Disabled);
      g_object_notify_by_pspec(G_OBJECT(settings), sObjProperties[PROP_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY]);
  }

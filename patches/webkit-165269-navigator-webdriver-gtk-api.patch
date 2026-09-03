@@ -1,6 +1,6 @@
---- a/Source/WebKit/UIProcess/API/glib/WebKitSettings.h.in	2026-02-23 22:40:56.460295200 +0800
-+++ b/Source/WebKit/UIProcess/API/glib/WebKitSettings.h.in	2026-09-03 08:28:49.266740930 +0800
-@@ -89,6 +89,22 @@
+--- a/Source/WebKit/UIProcess/API/glib/WebKitSettings.h.in
++++ b/Source/WebKit/UIProcess/API/glib/WebKitSettings.h.in
+@@ -89,6 +89,27 @@
      WEBKIT_HARDWARE_ACCELERATION_POLICY_ALWAYS,
      WEBKIT_HARDWARE_ACCELERATION_POLICY_NEVER
  } WebKitHardwareAccelerationPolicy;
@@ -20,10 +20,15 @@
 +    WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_ENABLED,
 +    WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_DISABLED
 +} WebKitNavigatorWebDriverActivePolicy;
++
++#define WEBKIT_TYPE_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY (webkit_navigator_webdriver_active_policy_get_type ())
++
++WEBKIT_API GType
++webkit_navigator_webdriver_active_policy_get_type (void);
  #endif
  
  WEBKIT_API WebKitSettings *
-@@ -506,6 +522,14 @@
+@@ -506,6 +527,14 @@
  webkit_settings_set_hardware_acceleration_policy               (WebKitSettings *settings,
                                                                  WebKitHardwareAccelerationPolicy policy);
  
@@ -38,8 +43,8 @@
  WEBKIT_API gboolean
  webkit_settings_get_enable_back_forward_navigation_gestures    (WebKitSettings *settings);
  
---- a/Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp	2026-03-25 18:23:21.923028700 +0800
-+++ b/Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp	2026-09-03 08:28:49.326038416 +0800
+--- a/Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp
++++ b/Source/WebKit/UIProcess/API/glib/WebKitSettings.cpp
 @@ -47,6 +47,7 @@
  #include <wtf/glib/WTFGType.h>
  #include <wtf/text/CStringView.h>
@@ -100,10 +105,26 @@
       * WebKitSettings:enable-back-forward-navigation-gestures:
       *
       * Enable or disable horizontal swipe gesture for back-forward navigation.
-@@ -3996,6 +4021,47 @@
+@@ -3996,6 +4021,63 @@
          g_object_notify_by_pspec(G_OBJECT(settings), sObjProperties[PROP_HARDWARE_ACCELERATION_POLICY]);
  }
  
++#if PLATFORM(GTK)
++GType webkit_navigator_webdriver_active_policy_get_type()
++{
++    static GType type = 0;
++    if (G_UNLIKELY(!type)) {
++        static const GEnumValue values[] = {
++            { WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_AUTO, "WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_AUTO", "auto" },
++            { WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_ENABLED, "WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_ENABLED", "enabled" },
++            { WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_DISABLED, "WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_DISABLED", "disabled" },
++            { 0, nullptr, nullptr }
++        };
++        type = g_enum_register_static("WebKitNavigatorWebDriverActivePolicy", values);
++    }
++    return type;
++}
++#endif
 +
 +/**
 + * webkit_settings_get_navigator_webdriver_active_policy:
@@ -120,7 +141,7 @@
 +    g_return_val_if_fail(WEBKIT_IS_SETTINGS(settings), WEBKIT_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY_AUTO);
 +
 +    WebKitSettingsPrivate* priv = settings->priv;
-+    return static_cast<WebKitNavigatorWebDriverActivePolicy>(priv->preferences->navigatorWebDriverActivePolicy());
++    return static_cast<WebKitNavigatorWebDriverActivePolicy>(static_cast<WebCore::NavigatorWebDriverActivePolicy>(priv->preferences->navigatorWebDriverActivePolicy()));
 +}
 +
 +/**
@@ -138,10 +159,10 @@
 +
 +    WebKitSettingsPrivate* priv = settings->priv;
 +    auto webCorePolicy = static_cast<WebCore::NavigatorWebDriverActivePolicy>(policy);
-+    if (priv->preferences->navigatorWebDriverActivePolicy() == webCorePolicy)
++    if (static_cast<WebCore::NavigatorWebDriverActivePolicy>(priv->preferences->navigatorWebDriverActivePolicy()) == webCorePolicy)
 +        return;
 +
-+    priv->preferences->setNavigatorWebDriverActivePolicy(webCorePolicy);
++    priv->preferences->setNavigatorWebDriverActivePolicy(static_cast<uint32_t>(webCorePolicy));
 +    g_object_notify_by_pspec(G_OBJECT(settings), sObjProperties[PROP_NAVIGATOR_WEBDRIVER_ACTIVE_POLICY]);
 +}
 +
