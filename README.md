@@ -73,7 +73,8 @@ The `#165269` policy patch keeps upstream’s **Auto** default. A **package-only
 
 ```vala
 var settings = new WebKit.Settings ();
-settings.navigator_webdriver_active_policy = WebKit.NavigatorWebDriverActivePolicy.DISABLED;
+WebKit.set_navigator_webdriver_active_policy (
+    settings, WebKit.NavigatorWebDriverActivePolicy.DISABLED);
 ```
 
 **C**:

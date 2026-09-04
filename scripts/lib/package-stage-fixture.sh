@@ -72,6 +72,7 @@ webkitgtk-automation-install-manifests:
 	echo 'debian/webkitgtk-6.0-webdriver.pc usr/lib/\$(DEB_HOST_MULTIARCH)/pkgconfig/' > debian/libwebkitgtk-6.0-webdriver-dev.install
 	echo 'debian/webkitgtk-webdriver/WebKitNavigatorWebDriverActivePolicy.h usr/include/webkitgtk-webdriver-6.0/' >> debian/libwebkitgtk-6.0-webdriver-dev.install
 	echo 'debian/webkitgtk-webdriver/webkitgtk-webdriver.vapi usr/share/vala/vapi/' >> debian/libwebkitgtk-6.0-webdriver-dev.install
+	echo 'debian/webkitgtk-webdriver/webkitgtk-webdriver.deps usr/share/vala/vapi/' >> debian/libwebkitgtk-6.0-webdriver-dev.install
 	echo debian/webkitgtk-6.0-webdriver.pc >> debian/clean
 EOF
 }

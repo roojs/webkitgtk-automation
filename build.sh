@@ -300,6 +300,7 @@ stage_webdriver_dev_bindings() {
   mkdir -p "$src/debian/webkitgtk-webdriver"
   cp "$REPO_ROOT/packaging/webkitgtk-webdriver/WebKitNavigatorWebDriverActivePolicy.h" \
     "$REPO_ROOT/packaging/webkitgtk-webdriver/webkitgtk-webdriver.vapi" \
+    "$REPO_ROOT/packaging/webkitgtk-webdriver/webkitgtk-webdriver.deps" \
     "$src/debian/webkitgtk-webdriver/"
 }
 

@@ -8,7 +8,7 @@
 #pragma once
 
 #include <glib-object.h>
-#include <webkitgtk-6.0/WebKitSettings.h>
+#include <webkit/WebKitSettings.h>
 
 G_BEGIN_DECLS
 
