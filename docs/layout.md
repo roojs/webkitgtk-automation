@@ -2,6 +2,7 @@
 
 | Path | Role |
 |------|------|
+| `docs/consuming.md` | Meson/C consumer guide; compile-time WebDriver interaction probe |
 | `scripts/pretest-patch.sh` | Dry-run patch against series `debian/rules` (no compile) |
 | `patches/enable-webdriver-gtk4.patch` | WebDriver GTK4 patch (resolute / gtk3-gtk4 layout) |
 | `patches/enable-webdriver-gtk4-soup3.patch` | WebDriver GTK4 patch (noble/plucky/questing / soup3-gtk4 layout) |

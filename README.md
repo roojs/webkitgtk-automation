@@ -105,6 +105,7 @@ With default **Auto** on a controlled view: expect `true`. After setting policy 
 
 ## Documentation
 
+- [Using the library](docs/consuming.md) — Meson/pkg-config integration, compile-time interaction probe
 - [Changelog](CHANGELOG.md) — **+webdriverN** releases and included patches per Ubuntu series
 - [Building locally](docs/building.md) — `./build.sh`, resume/caching, pretest
 - [CI builds](docs/ci.md) — GitHub Actions tags and workflows
