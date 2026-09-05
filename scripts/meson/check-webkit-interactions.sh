@@ -17,6 +17,7 @@ libdir="$(pkg-config --variable=libdir "$pc")"
 
 resolve_so() {
   local flag base candidates
+  # pkg-config --libs-only-l prints one space-separated line; split to flags.
   while read -r flag; do
     [[ -z "$flag" ]] && continue
     case "$flag" in
@@ -42,11 +43,13 @@ resolve_so() {
   return 1
 }
 
-so="$(pkg-config --libs-only-l "$pc" | resolve_so)" || exit 1
+so="$(pkg-config --libs-only-l "$pc" | tr ' ' '\n' | resolve_so)" || exit 1
 
-# SimulatedInputDispatcher is omitted when ENABLE_WEBDRIVER_*_INTERACTIONS are off
-# (Ubuntu stock GTK4). Fedora stock and libwebkitgtk-6.0-webdriver include it.
-if nm -D "$so" 2>/dev/null | grep -Fq 'SimulatedInputDispatcher'; then
+# SimulatedInputDispatcher is C++ and not exported in the dynamic symbol table, so
+# nm -D misses it. strings still sees the type/file names when interactions were
+# linked in. When ENABLE_WEBDRIVER_*_INTERACTIONS are off (Ubuntu stock GTK4),
+# those strings are absent.
+if strings "$so" 2>/dev/null | grep -Fq 'SimulatedInputDispatcher'; then
   exit 0
 fi
 
