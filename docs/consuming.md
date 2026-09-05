@@ -94,11 +94,11 @@ Point `check_script` at your checkout of this repository.
 
 ### Assumption
 
-The probe greps `strings` on the resolved `.so` for `SimulatedInputDispatcher`.
+The probe greps the resolved `.so` (`grep -a`) for `SimulatedInputDispatcher`.
 That type is C++ and not exported in the dynamic symbol table (`nm -D` misses it);
-the string appears when interaction code was linked in. The name has been stable
-across recent WebKit 2.5x releases; a future WebKit refactor could require
-updating the probe.
+the string appears in the binary when interaction code was linked in. The name has
+been stable across recent WebKit 2.5x releases; a future WebKit refactor could
+require updating the probe.
 
 ## Runtime
 
