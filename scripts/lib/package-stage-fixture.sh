@@ -2,6 +2,8 @@
 # Helpers to fake a "compiled" work tree for packaging-stage tests (no WebKit compile).
 # shellcheck source=scripts/lib/archive-apt.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/archive-apt.sh"
+# shellcheck source=scripts/lib/webdriver-dev-packaging.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/webdriver-dev-packaging.sh"
 # shellcheck source=scripts/lib/pinned-webkit-version.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/pinned-webkit-version.sh"
 
@@ -38,6 +40,8 @@ inject_install_manifest_target() {
     return 0
   fi
   local gtk4_sed_cmd='$(WEBKIT_DH_CONVERT_GTK4)'
+  local webdriver_install_lines
+  webdriver_install_lines="$(webdriver_dev_packaging_install_echo_snippets)"
   if [[ "$layout" == soup3-gtk4 ]]; then
     gtk4_sed_cmd='$(WEBKIT_DH_RENAME_GTK4)'
   fi
@@ -70,9 +74,7 @@ webkitgtk-automation-install-manifests:
 		echo 'Cflags: -I\$\${includedir}/webkitgtk-6.0 -I\$\${includedir}/webkitgtk-webdriver-6.0'; \\
 	} > debian/webkitgtk-6.0-webdriver.pc
 	echo 'debian/webkitgtk-6.0-webdriver.pc usr/lib/\$(DEB_HOST_MULTIARCH)/pkgconfig/' > debian/libwebkitgtk-6.0-webdriver-dev.install
-	echo 'debian/webkitgtk-webdriver/WebKitNavigatorWebDriverActivePolicy.h usr/include/webkitgtk-webdriver-6.0/' >> debian/libwebkitgtk-6.0-webdriver-dev.install
-	echo 'debian/webkitgtk-webdriver/webkitgtk-webdriver.vapi usr/share/vala/vapi/' >> debian/libwebkitgtk-6.0-webdriver-dev.install
-	echo 'debian/webkitgtk-webdriver/webkitgtk-webdriver.deps usr/share/vala/vapi/' >> debian/libwebkitgtk-6.0-webdriver-dev.install
+${webdriver_install_lines}
 	echo debian/webkitgtk-6.0-webdriver.pc >> debian/clean
 EOF
 }

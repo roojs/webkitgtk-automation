@@ -31,6 +31,8 @@ source "$REPO_ROOT/scripts/lib/rewrite-webdriver-packaging-metadata.sh"
 source "$REPO_ROOT/scripts/lib/webdriver-revision.sh"
 # shellcheck source=scripts/lib/gtk4-build-state.sh
 source "$REPO_ROOT/scripts/lib/gtk4-build-state.sh"
+# shellcheck source=scripts/lib/webdriver-dev-packaging.sh
+source "$REPO_ROOT/scripts/lib/webdriver-dev-packaging.sh"
 # shellcheck source=scripts/lib/debian-rules-fixture.sh
 source "$REPO_ROOT/scripts/lib/debian-rules-fixture.sh"
 
@@ -74,6 +76,7 @@ test_shell_syntax() {
     "$REPO_ROOT/scripts/lib/packaging-checks.sh" \
     "$REPO_ROOT/scripts/lib/gtk4-build-state.sh" \
     "$REPO_ROOT/scripts/lib/archive-apt.sh" \
+    "$REPO_ROOT/scripts/lib/webdriver-dev-packaging.sh" \
     "$REPO_ROOT/scripts/lib/package-stage-fixture.sh" \
     "$REPO_ROOT/scripts/lib/package-stage-dump.sh" \
     "$REPO_ROOT/scripts/simulate-package-stage.sh" \
@@ -438,16 +441,10 @@ EOF
 }
 
 test_webdriver_dev_packaging_files() {
-  echo "==> webdriver dev packaging files"
-  local dir="$REPO_ROOT/packaging/webkitgtk-webdriver"
-  local f
-  for f in \
-    WebKitNavigatorWebDriverActivePolicy.h \
-    webkitgtk-webdriver.vapi \
-    webkitgtk-webdriver.deps; do
-    [[ -f "$dir/$f" ]] || fail "missing $dir/$f (required by build.sh stage_webdriver_dev_bindings)"
-  done
-  pass "header, vapi, and deps present"
+  echo "==> webdriver dev packaging manifest"
+  assert_webdriver_dev_packaging_files "$REPO_ROOT" \
+    || fail "missing files listed in scripts/lib/webdriver-dev-packaging.sh"
+  pass "manifest files present"
 }
 
 test_debian_fixture_ready() {

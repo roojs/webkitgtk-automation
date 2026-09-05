@@ -26,6 +26,8 @@ source "$REPO_ROOT/scripts/lib/series-registry.sh"
 source "$REPO_ROOT/scripts/lib/rewrite-webdriver-packaging-metadata.sh"
 # shellcheck source=scripts/lib/webdriver-revision.sh
 source "$REPO_ROOT/scripts/lib/webdriver-revision.sh"
+# shellcheck source=scripts/lib/webdriver-dev-packaging.sh
+source "$REPO_ROOT/scripts/lib/webdriver-dev-packaging.sh"
 
 HOST_SERIES="$(host_series)"
 DEFAULT_SERIES="$HOST_SERIES"
@@ -129,6 +131,10 @@ fi
 
 if [[ ! -f "$COMPILE_CACHE_KEY_FILE" ]]; then
   echo "error: missing compile cache key: $COMPILE_CACHE_KEY_FILE" >&2
+  exit 1
+fi
+
+if ! assert_webdriver_dev_packaging_files "$REPO_ROOT"; then
   exit 1
 fi
 
@@ -293,15 +299,6 @@ apply_all_patches() {
   apply_source_patch "$WEBKIT_GTK_API_PATCH"
   apply_source_patch "$WEBKIT_INVISIBLE_PATCH"
   apply_cmake_patch
-}
-
-stage_webdriver_dev_bindings() {
-  local src="$1"
-  mkdir -p "$src/debian/webkitgtk-webdriver"
-  cp "$REPO_ROOT/packaging/webkitgtk-webdriver/WebKitNavigatorWebDriverActivePolicy.h" \
-    "$REPO_ROOT/packaging/webkitgtk-webdriver/webkitgtk-webdriver.vapi" \
-    "$REPO_ROOT/packaging/webkitgtk-webdriver/webkitgtk-webdriver.deps" \
-    "$src/debian/webkitgtk-webdriver/"
 }
 
 ensure_debian_control() {
@@ -605,7 +602,7 @@ else
   echo "==> source tree: $SRC_DIR"
 
   apply_all_patches
-  stage_webdriver_dev_bindings "$SRC_DIR"
+  stage_webdriver_dev_bindings "$REPO_ROOT" "$SRC_DIR"
 
   BASE_VERSION="$(dpkg-parsechangelog -S Version)"
   NEW_VERSION="${BASE_VERSION}${SUFFIX}"
@@ -622,7 +619,7 @@ if [[ "$RULES_REFRESHED" == "1" ]]; then
   drop_stale_packaging_files_after_rules_refresh
 fi
 
-stage_webdriver_dev_bindings "$SRC_DIR"
+stage_webdriver_dev_bindings "$REPO_ROOT" "$SRC_DIR"
 ensure_debian_control
 
 post_prepare_build_state() {
