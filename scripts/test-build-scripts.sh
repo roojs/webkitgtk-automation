@@ -437,6 +437,19 @@ EOF
   pass "package revision increments per series"
 }
 
+test_webdriver_dev_packaging_files() {
+  echo "==> webdriver dev packaging files"
+  local dir="$REPO_ROOT/packaging/webkitgtk-webdriver"
+  local f
+  for f in \
+    WebKitNavigatorWebDriverActivePolicy.h \
+    webkitgtk-webdriver.vapi \
+    webkitgtk-webdriver.deps; do
+    [[ -f "$dir/$f" ]] || fail "missing $dir/$f (required by build.sh stage_webdriver_dev_bindings)"
+  done
+  pass "header, vapi, and deps present"
+}
+
 test_debian_fixture_ready() {
   echo "==> debian fixture completeness"
   if ! debian_rules_fixture_ready "$SERIES" "$(read_pinned_webkit_version "$SERIES")"; then
@@ -497,6 +510,7 @@ main() {
   test_marker_matching
   test_marker_stage_compiled
   test_webdriver_package_revision
+  test_webdriver_dev_packaging_files
   test_debian_fixture_ready
   test_pinned_webkit_version
   test_packaging_flow
