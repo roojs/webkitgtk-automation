@@ -2,6 +2,6 @@
 # Bumped automatically after a successful package build is published.
 # Next build for a series uses (revision + 1), e.g. 1 -> +webdriver2.
 # User-facing release notes: CHANGELOG.md
-plucky=5
+plucky=6
 questing=4
 resolute=5
