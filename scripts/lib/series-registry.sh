@@ -81,7 +81,7 @@ webkit_invisible_patch_for_series() {
   root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
   case "$series" in
     plucky) echo "$root/patches/webkit-165269-navigator-webdriver-invisible-2.50.patch" ;;
-    resolute) echo "$root/patches/webkit-165269-navigator-webdriver-invisible-resolute.patch" ;;
+    resolute | stonking) echo "$root/patches/webkit-165269-navigator-webdriver-invisible-resolute.patch" ;;
     *) echo "$root/patches/webkit-165269-navigator-webdriver-invisible.patch" ;;
   esac
 }

@@ -8,7 +8,7 @@
 #   SERIES              Optional single series (default: all in MONITOR_BUILD_SERIES)
 #   DRY_RUN=1           Log actions only; do not commit, tag, or push
 #   FORCE_BUILD=1       Build even when upstream matches tracked (pretest still required)
-#   MONITOR_BUILD_SERIES       Space-separated series to auto-build (default: plucky questing resolute)
+#   MONITOR_BUILD_SERIES       Space-separated series to auto-build (default: plucky questing resolute stonking)
 #   MONITOR_PIN_SYNC_SERIES    Space-separated series to sync in pinned-webkit-version (includes noble)
 set -euo pipefail
 
@@ -102,9 +102,12 @@ process_build_series() {
   if [[ -n "${FORCE_BUILD:-}" && "${FORCE_BUILD}" != "0" ]]; then
     echo "==> FORCE_BUILD=1: will run pretest and queue a build for $series"
     need_build=1
-  elif [[ -z "$tracked" || "$tracked" == "$current" ]]; then
+  elif [[ -n "$tracked" && "$tracked" == "$current" ]]; then
     echo "==> [$series] up to date; no build needed"
     return 0
+  elif [[ -z "$tracked" ]]; then
+    echo "==> [$series] no successful release recorded yet; will build archive $current"
+    need_build=1
   elif [[ "$current" == "$pending" ]]; then
     tag="$(upstream_build_tag "$series" "$current")"
     if pending_build_failed "$series" "$tag"; then

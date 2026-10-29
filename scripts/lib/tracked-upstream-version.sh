@@ -124,7 +124,7 @@ monitor_build_series_list() {
     echo "$MONITOR_BUILD_SERIES"
     return 0
   fi
-  echo "plucky questing resolute"
+  echo "plucky questing resolute stonking"
 }
 
 monitor_pin_sync_series_list() {
@@ -132,5 +132,5 @@ monitor_pin_sync_series_list() {
     echo "$MONITOR_PIN_SYNC_SERIES"
     return 0
   fi
-  echo "noble plucky questing resolute"
+  echo "noble plucky questing resolute stonking"
 }

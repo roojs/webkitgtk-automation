@@ -12,6 +12,7 @@
 | `.github/workflows/build-plucky.yml` | Plucky build (noble runner → 25.04 upgrade → Release) |
 | `.github/workflows/build-questing.yml` | Questing build (noble runner → 25.10 upgrade → Release) |
 | `.github/workflows/build-resolute.yml` | Resolute build (26.04 native → Release) |
+| `.github/workflows/build-stonking.yml` | Stonking build (26.04 runner → 26.10 upgrade → Release) |
 | `cache/ccache` | Persistent compiler cache (gitignored) |
 | `.ci-cache/apt` | Apt `.deb` archives for CI (gitignored) |
 | `.ci-cache/work` | Packed work tree for resume (gitignored) |

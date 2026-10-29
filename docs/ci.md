@@ -6,6 +6,7 @@ Series, patch file, and packaging layout are centralized in `.github/series-regi
 noble=soup3-gtk4:enable-webdriver-gtk4-soup3.patch
 questing=soup3-gtk4:enable-webdriver-gtk4-soup3.patch
 resolute=gtk3-gtk4:enable-webdriver-gtk4.patch
+stonking=gtk3-gtk4:enable-webdriver-gtk4.patch
 ```
 
 | Where | Series |
@@ -13,6 +14,7 @@ resolute=gtk3-gtk4:enable-webdriver-gtk4.patch
 | GitHub Actions — **plucky** (`build-plucky-*` tags) | **plucky** (25.04) — noble runner upgraded in CI |
 | GitHub Actions — **questing** (`build-questing-*` tags) | **questing** (25.10) — noble runner upgraded in CI |
 | GitHub Actions — **resolute** (`build-resolute-*` tags) | **resolute** (26.04) — native on `ubuntu-26.04` |
+| GitHub Actions — **stonking** (`build-stonking-*` tags) | **stonking** (26.10) — `ubuntu-26.04` runner upgraded in CI |
 | Local | whatever you are running if listed in `.github/series-registry` |
 
 Install the `.deb` built for **your** Ubuntu series. A 25.10 package will not install on 25.04 (`libc6 >= 2.42`, exact `libjavascriptcoregtk-6.0-1` pin, `libxml2-16`).
@@ -54,6 +56,19 @@ Workflow: **Build libwebkitgtk-6.0 (26.04 resolute)** (`.github/workflows/build-
 
 Native on `ubuntu-26.04`. Apt cache under `.ci-cache/apt-resolute`. CI strips GHA preinstalls (CMake 4.4, browsers, SDKs), rewrites apt to `archive.ubuntu.com`, installs archive cmake and holds it, then builds.
 
+## Stonking (26.10)
+
+Push a `build-stonking-*` tag:
+
+```bash
+git tag build-stonking-$(date +%Y%m%d)
+git push origin build-stonking-$(date +%Y%m%d)
+```
+
+Workflow: **Build libwebkitgtk-6.0 (26.10 stonking)** (`.github/workflows/build-stonking.yml`).
+
+Starts on `ubuntu-26.04` (resolute), dist-upgrades the runner to **stonking**, then builds natively. Apt cache under `.ci-cache/apt-stonking`.
+
 When a workflow finishes, the `.deb`s are on that tag's **Release**.
 
 ## Manual run
@@ -73,7 +88,7 @@ Native build flow (series-specific runner setup differs):
 9. Save apt / ccache; on success upload `.deb`s and publish a Release
 
 **Upstream:** the daily **Monitor upstream webkit2gtk** workflow reads archive
-`Sources` for **plucky, questing, and resolute** (and syncs **noble** pins only).
+`Sources` for **plucky, questing, resolute, and stonking** (and syncs **noble** pins only).
 When Ubuntu publishes a newer source than we last built for a series, it syncs
 `.github/pinned-webkit-version`, runs pretest, and pushes a
 `build-<series>-upstream-*` tag. No manual pin bump.

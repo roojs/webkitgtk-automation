@@ -1,6 +1,6 @@
 name: Monitor upstream webkit2gtk
 
-# Daily: follow archive webkit2gtk for plucky, questing, resolute — sync pins, pretest, push build tags.
+# Daily: follow archive webkit2gtk for plucky, questing, resolute, stonking — sync pins, pretest, push build tags.
 on:
   schedule:
     - cron: "0 6 * * *"

@@ -21,7 +21,7 @@ https://github.com/user-attachments/assets/c09be86e-9f71-42d1-82da-fc2a4adadb0a
 
 ## Install
 
-Packages: `libwebkitgtk-6.0-webdriver4` (runtime) and `libwebkitgtk-6.0-webdriver-dev` (pkg-config). Published for Ubuntu 25.04 (plucky), 25.10 (questing), and 26.04 (resolute) in the [roojs APT repository](https://roojs.github.io/repos/).
+Packages: `libwebkitgtk-6.0-webdriver4` (runtime) and `libwebkitgtk-6.0-webdriver-dev` (pkg-config). Published for Ubuntu 25.04 (plucky), 25.10 (questing), 26.04 (resolute), and 26.10 (stonking) in the [roojs APT repository](https://roojs.github.io/repos/).
 
 Add the signing key and sources file (replace `@suite@` with `lsb_release -cs`):
 

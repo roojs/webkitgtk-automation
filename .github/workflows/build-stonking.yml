@@ -1,0 +1,281 @@
+name: Build libwebkitgtk-6.0 (26.10 stonking)
+
+# Stonking build: start on ubuntu-26.04 (resolute), dist-upgrade to 26.10, then compile.
+# Trigger: build-stonking-* tags or workflow_dispatch.
+on:
+  push:
+    tags:
+      - "build-stonking-*"
+  workflow_dispatch:
+    inputs:
+      suffix:
+        description: Debian package suffix (+webdriverN). Leave empty to auto-increment per series.
+        required: false
+        default: ""
+        type: string
+      clean:
+        description: Wipe work tree before building (ignore restored work cache)
+        required: false
+        default: false
+        type: boolean
+      clean_cache:
+        description: Also wipe persistent ccache
+        required: false
+        default: false
+        type: boolean
+      refresh_apt_cache:
+        description: Force a fresh apt archive cache key (re-download packages)
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: webkitgtk-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  APT_CACHE_DIR: .ci-cache/apt-stonking
+  WORK_CACHE_DIR: .ci-cache/work
+  SERIES: stonking
+  CLEAN: ${{ github.event.inputs.clean == 'true' && '1' || '0' }}
+  CLEAN_CACHE: ${{ github.event.inputs.clean_cache == 'true' && '1' || '0' }}
+  REFRESH_APT: ${{ github.event.inputs.refresh_apt_cache == 'true' && '1' || '0' }}
+  TRIGGER_TAG: ${{ github.event_name == 'push' && github.ref_type == 'tag' && github.ref_name || '' }}
+
+jobs:
+  pretest:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Fetch or restore pretest fixtures
+        uses: actions/cache@v5
+        with:
+          path: fixtures/
+          key: fixtures-${{ env.SERIES }}-${{ hashFiles('.github/pinned-webkit-version', 'patches/webkit-*.patch', 'patches/webkitgtk-variant-suffix.patch', 'scripts/fetch-fixtures.sh', 'scripts/lib/debian-rules-fixture.sh', 'scripts/lib/webkit-source-fixture.sh') }}
+
+      - name: Run pretest
+        env:
+          SERIES: ${{ env.SERIES }}
+        run: |
+          sudo apt-get install -y -qq devscripts debhelper fakeroot zstd binutils-gold curl
+          chmod +x ./scripts/run-pretest.sh
+          ./scripts/run-pretest.sh
+
+  build:
+    needs: pretest
+    runs-on: ubuntu-26.04
+    timeout-minutes: 480
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Resolve package version suffix
+        run: |
+          chmod +x .github/scripts/resolve-package-suffix.sh
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.suffix }}" ]]; then
+            echo "SUFFIX=${{ github.event.inputs.suffix }}" >> "$GITHUB_ENV"
+          else
+            echo "SUFFIX=$(.github/scripts/resolve-package-suffix.sh ${{ env.SERIES }})" >> "$GITHUB_ENV"
+          fi
+          echo "Package suffix: ${SUFFIX}"
+
+      - name: Free runner disk (remove unused SDKs)
+        run: |
+          chmod +x .github/scripts/free-runner-disk.sh .github/scripts/work-cache.sh .github/scripts/upgrade-runner-to-series.sh .github/scripts/strip-third-party-apt-sources.sh .github/scripts/setup-ci-build-env.sh .github/scripts/normalize-runner-apt-sources.sh .github/scripts/record-successful-build.sh
+          .github/scripts/free-runner-disk.sh
+
+      - name: Restore apt package cache
+        id: restore-apt
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ env.APT_CACHE_DIR }}
+          key: apt-webkitgtk-v1-${{ env.REFRESH_APT == '1' && github.run_id || 'stable' }}-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build-stonking.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/upgrade-runner-to-series.sh', 'build.sh') }}
+          restore-keys: |
+            apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-
+            apt-webkitgtk-v1-stable-${{ env.SERIES }}-
+            apt-webkitgtk-v1-
+
+      - name: Fix apt cache ownership for _apt
+        run: |
+          if [[ -d "${{ env.APT_CACHE_DIR }}" ]]; then
+            sudo mkdir -p "${{ env.APT_CACHE_DIR }}/partial"
+            sudo chown -R _apt:root "${{ env.APT_CACHE_DIR }}"
+            sudo chmod -R u+rwX,g+rwX "${{ env.APT_CACHE_DIR }}"
+          fi
+
+      - name: Upgrade runner resolute → stonking
+        env:
+          TARGET_SERIES: ${{ env.SERIES }}
+          BASE_SERIES: resolute
+          APT_CACHE_DIR: ${{ env.APT_CACHE_DIR }}
+        run: .github/scripts/upgrade-runner-to-series.sh
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v5
+        id: restore-ccache
+        with:
+          path: cache/ccache
+          key: ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/compile-cache-key') }}-
+            ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-
+            ccache-${{ env.SERIES }}-${{ runner.arch }}-
+            ccache-${{ env.SERIES }}-
+
+      - name: Restore work tree cache (incremental build)
+        id: restore-work
+        if: ${{ env.CLEAN != '1' }}
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ env.WORK_CACHE_DIR }}
+          key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
+          restore-keys: |
+            work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('.github/compile-cache-key') }}-
+            work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('patches/enable-webdriver-gtk4.patch') }}-
+            work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-
+            work-${{ env.SERIES }}-${{ runner.arch }}-
+
+      - name: Unpack work tree
+        if: ${{ env.CLEAN != '1' }}
+        run: |
+          set -euo pipefail
+          .github/scripts/work-cache.sh unpack || {
+            echo "work-cache unpack failed or empty; starting cold"
+            rm -rf work
+            mkdir -p work
+          }
+
+      - name: Show free disk before build
+        run: |
+          df -h
+          if [[ -d work ]]; then du -sh work work/* 2>/dev/null || true; fi
+
+      - name: Compile WebKit (gtk4)
+        id: compile
+        env:
+          SERIES: ${{ env.SERIES }}
+          SUFFIX: ${{ env.SUFFIX }}
+          CLEAN: ${{ env.CLEAN }}
+          CLEAN_CACHE: ${{ env.CLEAN_CACHE }}
+          CCACHE_MAXSIZE: 4G
+          BUILD_PARALLEL_JOBS: "2"
+          CI_BUILD_LIMITS: "1"
+          DEB_BUILD_OPTIONS: noautodbgsym nodoc nocheck
+          APT_CACHE_DIR: ${{ env.APT_CACHE_DIR }}
+          APT_UPGRADE: "0"
+        run: |
+          chmod +x ./build.sh
+          ./build.sh compile
+
+      - name: Pack work tree after compile
+        id: pack-work
+        if: ${{ always() && (steps.compile.outcome == 'success' || steps.compile.outcome == 'failure' || steps.compile.outcome == 'cancelled') }}
+        run: |
+          set -euo pipefail
+          .github/scripts/work-cache.sh pack
+
+      - name: Save work tree cache
+        if: ${{ always() && steps.pack-work.outcome == 'success' }}
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ env.WORK_CACHE_DIR }}
+          key: work-${{ env.SERIES }}-${{ runner.arch }}-${{ env.SUFFIX }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
+
+      - name: Save ccache after compile
+        if: ${{ always() && (steps.compile.outcome == 'success' || steps.compile.outcome == 'failure' || steps.compile.outcome == 'cancelled') }}
+        uses: actions/cache/save@v5
+        with:
+          path: cache/ccache
+          key: ccache-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/compile-cache-key') }}-${{ github.run_id }}
+
+      - name: Package .deb
+        id: package
+        env:
+          SERIES: ${{ env.SERIES }}
+          SUFFIX: ${{ env.SUFFIX }}
+          CLEAN: ${{ env.CLEAN }}
+          CLEAN_CACHE: ${{ env.CLEAN_CACHE }}
+          CCACHE_MAXSIZE: 4G
+          BUILD_PARALLEL_JOBS: "2"
+          CI_BUILD_LIMITS: "1"
+          DEB_BUILD_OPTIONS: noautodbgsym nodoc nocheck
+          APT_CACHE_DIR: ${{ env.APT_CACHE_DIR }}
+          APT_UPGRADE: "0"
+        run: |
+          chmod +x ./build.sh
+          ./build.sh package
+
+      - name: Save apt package cache
+        if: always() && steps.restore-apt.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ env.APT_CACHE_DIR }}
+          key: apt-webkitgtk-v1-stable-${{ env.SERIES }}-${{ runner.arch }}-${{ hashFiles('.github/workflows/build-stonking.yml', '.github/scripts/free-runner-disk.sh', '.github/scripts/upgrade-runner-to-series.sh', 'build.sh') }}
+
+      - name: Upload .deb artifacts
+        if: ${{ steps.package.outcome == 'success' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: libwebkitgtk-6.0-${{ env.SERIES }}
+          path: dist/*.deb
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: ${{ steps.package.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRIGGER_TAG: ${{ env.TRIGGER_TAG }}
+          SERIES: ${{ env.SERIES }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          DEBS=(dist/libwebkitgtk-6.0-webdriver4_*.deb)
+          if [[ ${#DEBS[@]} -eq 0 ]]; then
+            echo "error: no runtime .deb found in dist/" >&2
+            exit 1
+          fi
+          VERSION="$(dpkg-deb -f "${DEBS[0]}" Version)"
+          NOTES="Parallel-install libwebkitgtk-6.0-webdriver for Ubuntu ${SERIES} (26.10, ENABLE_WEBDRIVER, WebKit #318171).
+
+          Package version: \`${VERSION}\`
+
+          Installs **alongside** system \`libwebkitgtk-6.0-4\`. Uses system \`libjavascriptcoregtk-6.0-1\`.
+
+          \`\`\`bash
+          sudo apt install ./libwebkitgtk-6.0-webdriver4_*.deb ./libwebkitgtk-6.0-webdriver-dev_*.deb
+          \`\`\`
+
+          Meson: \`dependency('webkitgtk-6.0-webdriver')\` (requires thin -dev pc + system \`libwebkitgtk-6.0-dev\` for headers/vapi).
+          "
+
+          if [[ -n "${TRIGGER_TAG}" ]]; then
+            RELEASE_TAG="${TRIGGER_TAG}"
+            TITLE="${TRIGGER_TAG} (${VERSION})"
+          else
+            RELEASE_TAG="webkit2gtk-${VERSION//+/-}"
+            TITLE="webkit2gtk-${VERSION}"
+          fi
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" dist/*.deb --clobber
+            gh release edit "$RELEASE_TAG" --notes "$NOTES" || true
+          else
+            gh release create "$RELEASE_TAG" dist/*.deb \
+              --title "$TITLE" \
+              --notes "$NOTES"
+          fi
+          echo "Published to release: $RELEASE_TAG"
+
+      - name: Update tracked upstream version
+        if: ${{ steps.package.outcome == 'success' }}
+        env:
+          SERIES: ${{ env.SERIES }}
+          SUFFIX: ${{ env.SUFFIX }}
+        run: .github/scripts/record-successful-build.sh

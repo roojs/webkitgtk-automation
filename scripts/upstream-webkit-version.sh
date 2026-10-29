@@ -123,18 +123,19 @@ version_from_index() {
 }
 
 collect_versions() {
-  local pocket version
+  local pocket version found=0
   for pocket in "$SERIES" "${SERIES}-updates" "${SERIES}-security"; do
-    if ! version="$(version_from_index "$pocket")"; then
-      if [[ "$pocket" == "$SERIES" ]]; then
-        echo "warning: skipping base pocket $pocket (using updates/security only)" >&2
-        continue
-      fi
-      echo "error: failed to read $PACKAGE version from $(sources_index_url "$pocket")" >&2
-      return 1
+    if version="$(version_from_index "$pocket")"; then
+      echo "$version"
+      found=1
+    else
+      echo "warning: skipping pocket $pocket (no $PACKAGE version in Sources)" >&2
     fi
-    echo "$version"
   done
+  if [[ "$found" != "1" ]]; then
+    echo "error: $PACKAGE not found in any archive pocket for series=$SERIES" >&2
+    return 1
+  fi
 }
 
 mapfile -t versions < <(collect_versions)

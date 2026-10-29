@@ -12,6 +12,7 @@ on:
       - ".github/workflows/build-resolute.yml"
       - ".github/workflows/build-questing.yml"
       - ".github/workflows/build-plucky.yml"
+      - ".github/workflows/build-stonking.yml"
       - ".github/workflows/monitor-upstream.yml"
   pull_request:
     paths:
@@ -23,6 +24,7 @@ on:
       - ".github/workflows/build-resolute.yml"
       - ".github/workflows/build-questing.yml"
       - ".github/workflows/build-plucky.yml"
+      - ".github/workflows/build-stonking.yml"
       - ".github/workflows/monitor-upstream.yml"
   workflow_dispatch:
 
@@ -36,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        series: [plucky, questing, resolute]
+        series: [plucky, questing, resolute, stonking]
     steps:
       - name: Check out repository
         uses: actions/checkout@v5

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Upgrade a GitHub Actions runner from its base Ubuntu series to TARGET_SERIES.
 #
-# Used by build-plucky.yml / build-questing.yml: ubuntu-24.04 (noble) → 25.04/25.10.
+# Used by build-plucky.yml / build-questing.yml (noble → 25.04/25.10) and
+# build-stonking.yml (resolute → 26.10 on ubuntu-26.04 runners).
 #
 # GHA noble images ship noble-updates packages (mesa, libdrm) that are newer than
 # plucky. dist-upgrade will not replace those. So:
