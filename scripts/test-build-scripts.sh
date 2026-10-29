@@ -102,6 +102,17 @@ test_shell_syntax() {
   done
 }
 
+test_align_libx11_pin_in_subshell() {
+  echo "==> libx11-dev runtime pin (subshell, matches CI align path)"
+  pin="$(
+    # shellcheck source=.github/scripts/align-libx11-for-builddep.sh
+    source "$REPO_ROOT/.github/scripts/align-libx11-for-builddep.sh"
+    libx11_dev_runtime_pin "$SERIES"
+  )"
+  [[ -n "$pin" ]] || fail "empty libx11-6 pin for series=$SERIES"
+  pass "libx11-6 pin=$pin (series=$SERIES)"
+}
+
 test_compile_cache_key_pipefail() {
   echo "==> compile-cache-key parsing (set -o pipefail)"
   local key
@@ -522,6 +533,7 @@ main() {
 
   install_test_deps
   test_shell_syntax
+  test_align_libx11_pin_in_subshell
   test_compile_cache_key_pipefail
   test_marker_matching
   test_marker_stage_compiled

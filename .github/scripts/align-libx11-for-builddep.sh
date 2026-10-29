@@ -22,7 +22,6 @@ archive_libx11_dev_runtime_pin() {
   local series="$1" pkgz txt pin
   pkgz="$(mktemp)"
   txt="$(mktemp)"
-  trap 'rm -f "$pkgz" "$txt"' RETURN
   curl -fsSL "http://archive.ubuntu.com/ubuntu/dists/${series}/main/binary-amd64/Packages.gz" \
     -o "$pkgz"
   gzip -dc "$pkgz" >"$txt"
@@ -38,29 +37,33 @@ archive_libx11_dev_runtime_pin() {
         }
       ' "$txt"
   )"
+  rm -f "$pkgz" "$txt"
   [[ -n "$pin" ]] && echo "$pin"
 }
 
 libx11_dev_runtime_pin() {
-  local series="$1" pin ver
-  pin="$(
-    apt-cache show libx11-dev 2>/dev/null | depends_libx11_6_pin_from_show
-  )"
-  if [[ -n "$pin" ]]; then
-    echo "$pin"
-    return 0
+  local series="$1" pin ver show_text
+  # Avoid apt-cache | sed under set -o pipefail (sed exits first → SIGPIPE → 141).
+  show_text="$(apt-cache show libx11-dev 2>/dev/null || true)"
+  if [[ -n "$show_text" ]]; then
+    pin="$(printf '%s\n' "$show_text" | depends_libx11_6_pin_from_show)"
+    if [[ -n "$pin" ]]; then
+      echo "$pin"
+      return 0
+    fi
   fi
   ver="$(
     apt-cache policy libx11-dev 2>/dev/null \
       | awk '/^[[:space:]]*Candidate:/ { print $2; exit }'
   )"
   if [[ -n "$ver" && "$ver" != "(none)" ]]; then
-    pin="$(
-      apt-cache show "libx11-dev=$ver" 2>/dev/null | depends_libx11_6_pin_from_show
-    )"
-    if [[ -n "$pin" ]]; then
-      echo "$pin"
-      return 0
+    show_text="$(apt-cache show "libx11-dev=$ver" 2>/dev/null || true)"
+    if [[ -n "$show_text" ]]; then
+      pin="$(printf '%s\n' "$show_text" | depends_libx11_6_pin_from_show)"
+      if [[ -n "$pin" ]]; then
+        echo "$pin"
+        return 0
+      fi
     fi
   fi
   if [[ -n "$series" ]]; then
@@ -78,7 +81,13 @@ align_libx11_for_builddep() {
 
   "${SUDO[@]}" apt-get update -qq
 
-  pin="$(libx11_dev_runtime_pin "$series")"
+  # Command substitution runs in a subshell — libx11_dev_runtime_pin must not use
+  # RETURN traps that reference function locals (breaks under set -u).
+  local pin_file
+  pin_file="$(mktemp)"
+  libx11_dev_runtime_pin "$series" >"$pin_file"
+  pin="$(<"$pin_file")"
+  rm -f "$pin_file"
   if [[ -z "$pin" ]]; then
     echo "error: align libx11: could not resolve libx11-dev runtime pin (series=${series:-unknown})" >&2
     apt-cache policy libx11-6 libx11-dev 2>&1 || true
