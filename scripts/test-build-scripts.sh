@@ -92,7 +92,8 @@ test_shell_syntax() {
     "$REPO_ROOT/.github/scripts/upgrade-runner-to-series.sh" \
     "$REPO_ROOT/.github/scripts/strip-third-party-apt-sources.sh" \
     "$REPO_ROOT/.github/scripts/normalize-runner-apt-sources.sh" \
-    "$REPO_ROOT/.github/scripts/record-successful-build.sh"
+    "$REPO_ROOT/.github/scripts/record-successful-build.sh" \
+    "$REPO_ROOT/.github/scripts/align-libx11-for-builddep.sh"
   do
     bash -n "$f" || fail "bash -n $f"
     pass "$(basename "$f")"

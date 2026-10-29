@@ -446,6 +446,12 @@ enable_deb_src() {
 enable_deb_src
 
 if [[ "$STAGE_MODE" != "package" && -n "${GITHUB_ACTIONS:-}" ]]; then
+  # shellcheck source=.github/scripts/align-libx11-for-builddep.sh
+  source "$REPO_ROOT/.github/scripts/align-libx11-for-builddep.sh"
+  align_libx11_for_builddep
+fi
+
+if [[ "$STAGE_MODE" != "package" && -n "${GITHUB_ACTIONS:-}" ]]; then
   mapfile -t _held_back < <(apt-get -s upgrade 2>/dev/null | awk '/^Inst / { print $2 }' | sort -u)
   if ((${#_held_back[@]} > 0)); then
     echo "==> installing ${#_held_back[@]} held-back apt upgrades before build-dep: ${_held_back[*]}"

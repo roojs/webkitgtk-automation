@@ -423,6 +423,10 @@ main() {
     exit 1
   fi
 
+  # shellcheck source=.github/scripts/align-libx11-for-builddep.sh
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/align-libx11-for-builddep.sh"
+  align_libx11_for_builddep
+
   setup_post_upgrade_build_env
 
   echo "==> upgrade-runner-to-series done ($(host_series))"
