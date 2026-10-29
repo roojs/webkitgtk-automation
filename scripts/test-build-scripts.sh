@@ -19,6 +19,8 @@ MARKER_NAME=".webkitgtk-automation-prepared"
 source "$REPO_ROOT/scripts/lib/debian-tarball.sh"
 # shellcheck source=scripts/lib/pinned-webkit-version.sh
 source "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh"
+# shellcheck source=scripts/lib/tracked-upstream-version.sh
+source "$REPO_ROOT/scripts/lib/tracked-upstream-version.sh"
 # shellcheck source=scripts/lib/host-series.sh
 source "$REPO_ROOT/scripts/lib/host-series.sh"
 # shellcheck source=scripts/lib/series-registry.sh
@@ -72,6 +74,7 @@ test_shell_syntax() {
     "$REPO_ROOT/scripts/monitor-upstream-build.sh" \
     "$REPO_ROOT/scripts/lib/debian-tarball.sh" \
     "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh" \
+    "$REPO_ROOT/scripts/lib/tracked-upstream-version.sh" \
     "$REPO_ROOT/scripts/lib/host-series.sh" \
     "$REPO_ROOT/scripts/lib/series-registry.sh" \
     "$REPO_ROOT/scripts/lib/packaging-checks.sh" \
@@ -464,6 +467,18 @@ test_pinned_webkit_version() {
   pass "$SERIES=$pinned"
 }
 
+test_tracked_upstream_version() {
+  echo "==> tracked upstream version (per series)"
+  local tmp tracked
+  tmp="$(mktemp)"
+  TRACKED_UPSTREAM_VERSION_FILE="$tmp" write_tracked_upstream_version questing "2.52.3-0ubuntu0.25.10.1"
+  tracked="$(TRACKED_UPSTREAM_VERSION_FILE="$tmp" read_tracked_upstream_version questing)"
+  [[ "$tracked" == "2.52.3-0ubuntu0.25.10.1" ]] || fail "tracked read/write: $tracked"
+  dpkg_version_lt "2.50.4-0ubuntu0.25.04.1" "2.52.3-0ubuntu0.25.10.1" || fail "dpkg_version_lt"
+  rm -f "$tmp"
+  pass "tracked upstream helpers"
+}
+
 test_upstream_version_probe() {
   echo "==> upstream webkit2gtk version probe"
   local ver
@@ -511,6 +526,7 @@ main() {
   test_webdriver_dev_packaging_files
   test_debian_fixture_ready
   test_pinned_webkit_version
+  test_tracked_upstream_version
   test_packaging_flow
   test_work_cache_roundtrip
   test_work_cache_refuses_corrupt_tree

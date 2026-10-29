@@ -1,6 +1,6 @@
 name: Monitor upstream webkit2gtk
 
-# Daily: follow archive webkit2gtk for resolute — sync pin, pretest, push build tag.
+# Daily: follow archive webkit2gtk for plucky, questing, resolute — sync pins, pretest, push build tags.
 on:
   schedule:
     - cron: "0 6 * * *"
@@ -24,9 +24,6 @@ concurrency:
   group: webkitgtk-monitor-upstream
   cancel-in-progress: false
 
-env:
-  SERIES: resolute
-
 jobs:
   monitor:
     runs-on: ubuntu-26.04
@@ -41,11 +38,10 @@ jobs:
         uses: actions/cache@v5
         with:
           path: .cache/upstream-sources
-          key: upstream-sources-${{ env.SERIES }}
+          key: upstream-sources-v2-${{ runner.os }}
 
       - name: Monitor upstream and queue build if needed
         env:
-          SERIES: ${{ env.SERIES }}
           DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '0' }}
           FORCE_BUILD: ${{ github.event.inputs.force_build == 'true' && '1' || '0' }}
           UPSTREAM_SOURCES_CACHE_DIR: .cache/upstream-sources

@@ -73,9 +73,10 @@ Native build flow (series-specific runner setup differs):
 9. Save apt / ccache; on success upload `.deb`s and publish a Release
 
 **Upstream:** the daily **Monitor upstream webkit2gtk** workflow reads archive
-`Sources` for resolute. When Ubuntu publishes a newer source than we last built,
-it syncs `.github/pinned-webkit-version`, runs pretest, and pushes a
-`build-upstream-*` tag. No manual pin bump.
+`Sources` for **plucky, questing, and resolute** (and syncs **noble** pins only).
+When Ubuntu publishes a newer source than we last built for a series, it syncs
+`.github/pinned-webkit-version`, runs pretest, and pushes a
+`build-<series>-upstream-*` tag. No manual pin bump.
 
 Builds fetch the series row from `.github/pinned-webkit-version` (kept in sync with
 archive by the monitor). The CI image’s preinstalled CMake 4.4.x is removed;
