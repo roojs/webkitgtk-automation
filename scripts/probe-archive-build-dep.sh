@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Optional utility (not run by pretest or build workflows).
 # Simulate webkit2gtk build-dep against archive.ubuntu.com for one series (~1–3 min).
 # Does not dist-upgrade the host — catches missing/broken archive deps, not post-upgrade
 # libx11 skew on a GHA runner (that still needs the full stonking job once).

@@ -71,19 +71,17 @@ Starts on `ubuntu-26.04` (resolute), dist-upgrades the runner to **stonking**, t
 
 When a workflow finishes, the `.deb`s are on that tag's **Release**.
 
-## Testing apt before a stonking compile
+## Optional apt utilities (not part of pretest or build workflows)
 
-When stonking CI fails at **`build-dep webkit2gtk`**, the full build job already dies in about **15 minutes** — the same cost as the optional **Verify CI build-dep** workflow (dist-upgrade + build-dep). Running verify first does not save time for that failure mode.
+When stonking CI fails at **`build-dep webkit2gtk`**, the build job usually stops in about **15 minutes** — the same cost as **Verify CI build-dep** (dist-upgrade + build-dep). Neither is wired into the normal build flow; run them manually when debugging apt.
 
-**What actually helps:**
+**Archive simulate (~1–3 min, any machine with network):** `scripts/probe-archive-build-dep.sh` simulates `apt-get build-dep webkit2gtk` against `archive.ubuntu.com` for a series without dist-upgrading the host. Useful to check archive dependency resolution; it does not reproduce post-upgrade runner skew (e.g. libx11 SRU vs release pin).
 
-1. **Pretest (every push)** — `scripts/probe-archive-build-dep.sh` runs in the pretest matrix (~1–3 minutes per series with a warm apt list cache). It simulates `apt-get build-dep webkit2gtk` against `archive.ubuntu.com` for plucky/questing/resolute/stonking without dist-upgrading the runner. That catches broken or missing archive dependencies early.
+```bash
+./scripts/probe-archive-build-dep.sh stonking
+```
 
-   ```bash
-   ./scripts/probe-archive-build-dep.sh stonking
-   ```
-
-2. **Full runner path (optional)** — **Verify CI build-dep** or `./scripts/verify-ci-build-dep.sh stonking` only when you need to reproduce **post-dist-upgrade** apt skew (e.g. libx11 SRU vs release pin). Expect ~15 minutes; use after archive probe is green, not instead of kicking off a stonking build when failures are already at build-dep.
+**Full runner path (~15 min):** **Verify CI build-dep** (Actions, manual) or `./scripts/verify-ci-build-dep.sh stonking` on `ubuntu-26.04` when you need the same dist-upgrade + host apt state as the stonking build.
 
 ## Manual run
 

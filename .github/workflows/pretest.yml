@@ -49,12 +49,6 @@ jobs:
           path: fixtures/
           key: fixtures-${{ matrix.series }}-${{ hashFiles('.github/pinned-webkit-version', 'patches/webkit-*.patch', 'patches/webkitgtk-variant-suffix.patch', 'scripts/fetch-fixtures.sh', 'scripts/lib/debian-rules-fixture.sh', 'scripts/lib/webkit-source-fixture.sh') }}
 
-      - name: Restore archive build-dep probe cache
-        uses: actions/cache@v5
-        with:
-          path: .ci-cache/probe-archive-apt-${{ matrix.series }}
-          key: probe-archive-apt-v1-${{ matrix.series }}-${{ hashFiles('scripts/probe-archive-build-dep.sh', 'scripts/lib/archive-apt.sh') }}
-
       - name: Populate pretest fixtures
         run: |
           chmod +x ./scripts/fetch-fixtures.sh
