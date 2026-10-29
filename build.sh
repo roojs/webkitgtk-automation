@@ -445,6 +445,14 @@ enable_deb_src() {
 
 enable_deb_src
 
+if [[ "$STAGE_MODE" != "package" && -n "${GITHUB_ACTIONS:-}" ]]; then
+  mapfile -t _held_back < <(apt-get -s upgrade 2>/dev/null | awk '/^Inst / { print $2 }' | sort -u)
+  if ((${#_held_back[@]} > 0)); then
+    echo "==> installing ${#_held_back[@]} held-back apt upgrades before build-dep: ${_held_back[*]}"
+    apt_get install -y --allow-downgrades "${_held_back[@]}" || true
+  fi
+fi
+
 if [[ "$STAGE_MODE" != "package" ]]; then
   apt_get build-dep -y webkit2gtk
 fi

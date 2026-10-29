@@ -173,16 +173,32 @@ safe_to_purge_sru_leftover() {
   return 1
 }
 
-# Noble-updates SRU versions contain "24.04" (e.g. 2.4.125-1ubuntu0.1~24.04.2).
-# Stock noble *release* packages do not. After pointing apt at noble release,
-# force those leftovers onto the suite version. Purge only updates-only extras.
+base_ubuntu_version_marker() {
+  case "$1" in
+    noble) echo "24.04" ;;
+    plucky) echo "25.04" ;;
+    questing) echo "25.10" ;;
+    resolute) echo "26.04" ;;
+    stonking) echo "26.10" ;;
+    *) echo "" ;;
+  esac
+}
+
+# SRU versions embed the suite (e.g. 2.4.125-1ubuntu0.1~24.04.2). After pointing
+# apt at stock BASE_SERIES release, force those leftovers onto the suite version.
 downgrade_sru_leftovers_to_base_release() {
-  local pkg ver
+  local pkg ver marker
   local -a leftover=()
-  echo "==> downgrading leftover *24.04* packages to stock $BASE_SERIES release"
+  marker="$(base_ubuntu_version_marker "$BASE_SERIES")"
+  if [[ -z "$marker" ]]; then
+    echo "==> skip SRU leftover downgrade (unknown marker for $BASE_SERIES)"
+    repair_usrmerge_compat_links
+    return 0
+  fi
+  echo "==> downgrading leftover *${marker}* packages to stock $BASE_SERIES release"
   while read -r pkg ver; do
     [[ -n "$pkg" && -n "$ver" ]] || continue
-    [[ "$ver" == *24.04* ]] || continue
+    [[ "$ver" == *"$marker"* ]] || continue
     leftover+=("$pkg")
   done < <(dpkg-query -W -f '${Package} ${Version}\n' 2>/dev/null || true)
 
@@ -235,15 +251,48 @@ downgrade_sru_leftovers_to_base_release() {
 
 assert_no_sru_canaries() {
   local when="$1"
-  local pkg ver
-  for pkg in libdrm2 libgl1-mesa-dri mesa-libgallium; do
+  local pkg ver marker
+  marker="$(base_ubuntu_version_marker "$BASE_SERIES")"
+  [[ -n "$marker" ]] || return 0
+  for pkg in libdrm2 libgl1-mesa-dri mesa-libgallium libx11-6 libx11-dev; do
     ver="$(dpkg-query -W -f '${Version}' "$pkg" 2>/dev/null || true)"
     [[ -n "$ver" ]] || continue
-    if [[ "$ver" == *24.04* ]]; then
+    if [[ "$ver" == *"$marker"* && "$(host_series)" == "$TARGET_SERIES" ]]; then
       echo "error: $pkg still $ver after $when (build-dep will fail)" >&2
       exit 1
     fi
   done
+}
+
+repair_packages_still_on_base_marker() {
+  local target="$1" marker pkg ver
+  local -a pins=()
+  marker="$(base_ubuntu_version_marker "$BASE_SERIES")"
+  [[ -n "$marker" ]] || return 0
+  while read -r pkg ver; do
+    [[ -n "$pkg" && -n "$ver" ]] || continue
+    [[ "$ver" == *"$marker"* ]] || continue
+    if apt-cache show "$pkg" >/dev/null 2>&1; then
+      pins+=("${pkg}/${target}")
+    fi
+  done < <(dpkg-query -W -f '${Package} ${Version}\n' 2>/dev/null || true)
+  if ((${#pins[@]} == 0)); then
+    echo "==> no ${marker} leftovers on $target"
+    return 0
+  fi
+  echo "==> pinning ${marker} leftovers to $target: ${pins[*]}"
+  apt_get install -y --allow-downgrades "${pins[@]}"
+}
+
+repair_apt_upgradable_packages() {
+  local -a pkgs=()
+  mapfile -t pkgs < <(apt-get -s upgrade 2>/dev/null | awk '/^Inst / { print $2 }' | sort -u)
+  if ((${#pkgs[@]} == 0)); then
+    echo "==> apt: no held-back upgrades"
+    return 0
+  fi
+  echo "==> apt: installing ${#pkgs[@]} held-back upgrades: ${pkgs[*]}"
+  apt_get install -y --allow-downgrades "${pkgs[@]}"
 }
 
 # shellcheck source=.github/scripts/normalize-runner-apt-sources.sh
@@ -358,6 +407,10 @@ main() {
     apt_dist_upgrade
   fi
   apt_get install -y --fix-broken --allow-downgrades || true
+  repair_packages_still_on_base_marker "$TARGET_SERIES"
+  repair_apt_upgradable_packages
+  apt_dist_upgrade
+  repair_apt_upgradable_packages
   apt_get autoremove -y --purge || true
   apt_get autoclean -y || true
   assert_no_sru_canaries "$TARGET_SERIES upgrade"
