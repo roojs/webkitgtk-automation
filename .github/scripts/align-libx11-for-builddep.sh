@@ -14,37 +14,54 @@ fi
 
 export DEBIAN_FRONTEND=noninteractive
 
+depends_libx11_6_pin_from_show() {
+  sed -n 's/^Depends:.*libx11-6 (= \([^)]*\)).*/\1/p;q'
+}
+
 archive_libx11_dev_runtime_pin() {
-  local series="$1" pkgz pin
+  local series="$1" pkgz txt pin
   pkgz="$(mktemp)"
-  trap 'rm -f "$pkgz"' RETURN
+  txt="$(mktemp)"
+  trap 'rm -f "$pkgz" "$txt"' RETURN
   curl -fsSL "http://archive.ubuntu.com/ubuntu/dists/${series}/main/binary-amd64/Packages.gz" \
     -o "$pkgz"
+  gzip -dc "$pkgz" >"$txt"
   pin="$(
-    gzip -dc "$pkgz" \
-      | awk '
-          /^Package: / { cur = $2 }
-          cur == "libx11-dev" && /^Depends: / && /libx11-6 \(= / {
-            line = $0
-            sub(/.*libx11-6 \(= /, "", line)
-            sub(/\).*/, "", line)
-            print line
-            exit
-          }
-        '
+    awk '
+        /^Package: / { cur = $2 }
+        cur == "libx11-dev" && /^Depends: / && /libx11-6 \(= / {
+          line = $0
+          sub(/.*libx11-6 \(= /, "", line)
+          sub(/\).*/, "", line)
+          print line
+          exit
+        }
+      ' "$txt"
   )"
   [[ -n "$pin" ]] && echo "$pin"
 }
 
 libx11_dev_runtime_pin() {
-  local series="$1" pin
+  local series="$1" pin ver
   pin="$(
-    apt-cache show libx11-dev 2>/dev/null \
-      | sed -n 's/^Depends:.*libx11-6 (= \([^)]*\)).*/\1/p;q'
+    apt-cache show libx11-dev 2>/dev/null | depends_libx11_6_pin_from_show
   )"
   if [[ -n "$pin" ]]; then
     echo "$pin"
     return 0
+  fi
+  ver="$(
+    apt-cache policy libx11-dev 2>/dev/null \
+      | awk '/^[[:space:]]*Candidate:/ { print $2; exit }'
+  )"
+  if [[ -n "$ver" && "$ver" != "(none)" ]]; then
+    pin="$(
+      apt-cache show "libx11-dev=$ver" 2>/dev/null | depends_libx11_6_pin_from_show
+    )"
+    if [[ -n "$pin" ]]; then
+      echo "$pin"
+      return 0
+    fi
   fi
   if [[ -n "$series" ]]; then
     archive_libx11_dev_runtime_pin "$series"
