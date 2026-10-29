@@ -71,6 +71,25 @@ Starts on `ubuntu-26.04` (resolute), dist-upgrades the runner to **stonking**, t
 
 When a workflow finishes, the `.deb`s are on that tag's **Release**.
 
+## Verify CI build-dep (fast, before a full compile)
+
+Full stonking/resolute compiles take hours. To exercise the same **dist-upgrade + apt + `build-dep webkit2gtk`** path without building WebKit:
+
+**Actions → Verify CI build-dep → Run workflow** (choose `stonking`, leave dry-run off).
+
+Or on a matching GitHub-hosted runner image locally in Actions, the script:
+
+```bash
+./scripts/verify-ci-build-dep.sh stonking   # needs ubuntu-26.04 job / machine
+./scripts/verify-ci-build-dep.sh resolute   # native on ubuntu-26.04
+```
+
+`DRY_RUN=1` only runs `apt-get -s build-dep` after upgrade. `SKIP_FREE_DISK=1` skips the disk cleanup step.
+
+Pushes that touch upgrade/apt scripts also run this workflow automatically for **stonking** on `main`.
+
+Only after **Verify CI build-dep** is green should you run **Build libwebkitgtk-6.0 (26.10 stonking)**.
+
 ## Manual run
 
 **Actions →** pick the questing or resolute workflow → **Run workflow**.

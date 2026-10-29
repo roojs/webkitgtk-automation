@@ -423,11 +423,11 @@ main() {
     exit 1
   fi
 
+  setup_post_upgrade_build_env
+
   # shellcheck source=.github/scripts/align-libx11-for-builddep.sh
   source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/align-libx11-for-builddep.sh"
-  align_libx11_for_builddep
-
-  setup_post_upgrade_build_env
+  align_libx11_for_builddep "$TARGET_SERIES"
 
   echo "==> upgrade-runner-to-series done ($(host_series))"
 }

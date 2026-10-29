@@ -1,0 +1,58 @@
+name: Verify CI build-dep
+
+# Fast gate: same runner upgrade + apt as full builds, stops after webkit2gtk build-dep.
+# Run this (workflow_dispatch) before kicking off a multi-hour stonking/resolute compile.
+on:
+  workflow_dispatch:
+    inputs:
+      series:
+        description: Ubuntu series to verify
+        required: true
+        default: stonking
+        type: choice
+        options:
+          - stonking
+          - resolute
+          - questing
+          - plucky
+      skip_free_disk:
+        description: Skip free-runner-disk (less like prod CI, slightly faster)
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: Only apt-get -s build-dep after upgrade (no package install)
+        required: false
+        default: false
+        type: boolean
+  push:
+    branches: [main]
+    paths:
+      - ".github/scripts/upgrade-runner-to-series.sh"
+      - ".github/scripts/align-libx11-for-builddep.sh"
+      - ".github/scripts/setup-ci-build-env.sh"
+      - ".github/scripts/free-runner-disk.sh"
+      - "scripts/verify-ci-build-dep.sh"
+      - "build.sh"
+      - ".github/workflows/verify-ci-build-dep.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ${{ contains(fromJSON('["stonking", "resolute"]'), github.event.inputs.series || 'stonking') && 'ubuntu-26.04' || 'ubuntu-24.04' }}
+    timeout-minutes: 45
+    env:
+      SERIES: ${{ github.event_name == 'workflow_dispatch' && inputs.series || 'stonking' }}
+      SKIP_FREE_DISK: ${{ github.event.inputs.skip_free_disk == 'true' && '1' || '0' }}
+      DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '0' }}
+      APT_CACHE_DIR: .ci-cache/apt-verify-${{ github.event_name == 'workflow_dispatch' && inputs.series || 'stonking' }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Verify webkit2gtk build-dep
+        run: |
+          chmod +x ./scripts/verify-ci-build-dep.sh ./build.sh
+          ./scripts/verify-ci-build-dep.sh "$SERIES"

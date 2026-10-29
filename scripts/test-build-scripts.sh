@@ -72,6 +72,7 @@ test_shell_syntax() {
     "$REPO_ROOT/scripts/run-pretest.sh" \
     "$REPO_ROOT/scripts/upstream-webkit-version.sh" \
     "$REPO_ROOT/scripts/monitor-upstream-build.sh" \
+    "$REPO_ROOT/scripts/verify-ci-build-dep.sh" \
     "$REPO_ROOT/scripts/lib/debian-tarball.sh" \
     "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh" \
     "$REPO_ROOT/scripts/lib/tracked-upstream-version.sh" \
