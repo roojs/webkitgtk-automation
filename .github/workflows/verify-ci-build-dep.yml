@@ -1,7 +1,7 @@
 name: Verify CI build-dep
 
-# Fast gate: same runner upgrade + apt as full builds, stops after webkit2gtk build-dep.
-# Run this (workflow_dispatch) before kicking off a multi-hour stonking/resolute compile.
+# Same dist-upgrade + build-dep as stonking/resolute builds (~15m). Not faster when compile
+# fails at build-dep anyway — use pretest archive probe first. Manual only for runner-state bugs.
 on:
   workflow_dispatch:
     inputs:
@@ -25,17 +25,6 @@ on:
         required: false
         default: false
         type: boolean
-  push:
-    branches: [main]
-    paths:
-      - ".github/scripts/upgrade-runner-to-series.sh"
-      - ".github/scripts/align-libx11-for-builddep.sh"
-      - ".github/scripts/setup-ci-build-env.sh"
-      - ".github/scripts/free-runner-disk.sh"
-      - "scripts/verify-ci-build-dep.sh"
-      - "build.sh"
-      - ".github/workflows/verify-ci-build-dep.yml"
-
 permissions:
   contents: read
 

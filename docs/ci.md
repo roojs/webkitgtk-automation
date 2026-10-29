@@ -71,24 +71,19 @@ Starts on `ubuntu-26.04` (resolute), dist-upgrades the runner to **stonking**, t
 
 When a workflow finishes, the `.deb`s are on that tag's **Release**.
 
-## Verify CI build-dep (fast, before a full compile)
+## Testing apt before a stonking compile
 
-Full stonking/resolute compiles take hours. To exercise the same **dist-upgrade + apt + `build-dep webkit2gtk`** path without building WebKit:
+When stonking CI fails at **`build-dep webkit2gtk`**, the full build job already dies in about **15 minutes** — the same cost as the optional **Verify CI build-dep** workflow (dist-upgrade + build-dep). Running verify first does not save time for that failure mode.
 
-**Actions → Verify CI build-dep → Run workflow** (choose `stonking`, leave dry-run off).
+**What actually helps:**
 
-Or on a matching GitHub-hosted runner image locally in Actions, the script:
+1. **Pretest (every push)** — `scripts/probe-archive-build-dep.sh` runs in the pretest matrix (~1–3 minutes per series with a warm apt list cache). It simulates `apt-get build-dep webkit2gtk` against `archive.ubuntu.com` for plucky/questing/resolute/stonking without dist-upgrading the runner. That catches broken or missing archive dependencies early.
 
-```bash
-./scripts/verify-ci-build-dep.sh stonking   # needs ubuntu-26.04 job / machine
-./scripts/verify-ci-build-dep.sh resolute   # native on ubuntu-26.04
-```
+   ```bash
+   ./scripts/probe-archive-build-dep.sh stonking
+   ```
 
-`DRY_RUN=1` only runs `apt-get -s build-dep` after upgrade. `SKIP_FREE_DISK=1` skips the disk cleanup step.
-
-Pushes that touch upgrade/apt scripts also run this workflow automatically for **stonking** on `main`.
-
-Only after **Verify CI build-dep** is green should you run **Build libwebkitgtk-6.0 (26.10 stonking)**.
+2. **Full runner path (optional)** — **Verify CI build-dep** or `./scripts/verify-ci-build-dep.sh stonking` only when you need to reproduce **post-dist-upgrade** apt skew (e.g. libx11 SRU vs release pin). Expect ~15 minutes; use after archive probe is green, not instead of kicking off a stonking build when failures are already at build-dep.
 
 ## Manual run
 

@@ -72,6 +72,7 @@ test_shell_syntax() {
     "$REPO_ROOT/scripts/run-pretest.sh" \
     "$REPO_ROOT/scripts/upstream-webkit-version.sh" \
     "$REPO_ROOT/scripts/monitor-upstream-build.sh" \
+    "$REPO_ROOT/scripts/probe-archive-build-dep.sh" \
     "$REPO_ROOT/scripts/verify-ci-build-dep.sh" \
     "$REPO_ROOT/scripts/lib/debian-tarball.sh" \
     "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh" \
@@ -514,6 +515,14 @@ skip_slow() {
   echo "  skip: $1 (set PRETEST_FAST=0 to run)"
 }
 
+test_archive_build_dep_probe() {
+  echo "==> archive build-dep simulate (webkit2gtk, series=$SERIES)"
+  chmod +x "$REPO_ROOT/scripts/probe-archive-build-dep.sh"
+  PROBE_ARCHIVE_APT_BASE="$REPO_ROOT/.ci-cache/probe-archive-apt-$SERIES" \
+    "$REPO_ROOT/scripts/probe-archive-build-dep.sh" "$SERIES"
+  pass "archive build-dep resolves for $SERIES"
+}
+
 main() {
   echo "==> test-build-scripts series=$SERIES layout=$LAYOUT pretest_fast=$PRETEST_FAST"
   [[ -f "$PATCH" ]] || fail "missing $PATCH"
@@ -532,6 +541,7 @@ main() {
   test_packaging_flow
   test_work_cache_roundtrip
   test_work_cache_refuses_corrupt_tree
+  test_archive_build_dep_probe
   if [[ "$PRETEST_FAST" == "1" ]]; then
     skip_slow "upstream webkit2gtk version probe"
     skip_slow "rules refresh without cached debian tarball"

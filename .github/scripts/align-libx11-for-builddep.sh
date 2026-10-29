@@ -15,19 +15,25 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 
 archive_libx11_dev_runtime_pin() {
-  local series="$1"
+  local series="$1" pkgz pin
+  pkgz="$(mktemp)"
+  trap 'rm -f "$pkgz"' RETURN
   curl -fsSL "http://archive.ubuntu.com/ubuntu/dists/${series}/main/binary-amd64/Packages.gz" \
-    | gzip -dc \
-    | awk '
-        /^Package: / { cur = $2 }
-        cur == "libx11-dev" && /^Depends: / && /libx11-6 \(= / {
-          line = $0
-          sub(/.*libx11-6 \(= /, "", line)
-          sub(/\).*/, "", line)
-          print line
-          exit
-        }
-      '
+    -o "$pkgz"
+  pin="$(
+    gzip -dc "$pkgz" \
+      | awk '
+          /^Package: / { cur = $2 }
+          cur == "libx11-dev" && /^Depends: / && /libx11-6 \(= / {
+            line = $0
+            sub(/.*libx11-6 \(= /, "", line)
+            sub(/\).*/, "", line)
+            print line
+            exit
+          }
+        '
+  )"
+  [[ -n "$pin" ]] && echo "$pin"
 }
 
 libx11_dev_runtime_pin() {
