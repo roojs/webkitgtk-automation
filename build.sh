@@ -50,7 +50,7 @@ fi
 SUFFIX="${SUFFIX:-+webdriver1}"
 PATCH="$(patch_file_for_series "$SERIES")"
 CMAKE_PATCH="$REPO_ROOT/patches/webkitgtk-variant-suffix.patch"
-WEBKIT_INTERACTIONS_PATCH="$REPO_ROOT/patches/webkit-318171-webdriver-interactions.patch"
+WEBKIT_INTERACTIONS_PATCH="$(webkit_interactions_patch_for_series "$SERIES")"
 WEBKIT_POLICY_PATCH="$(webkit_policy_patch_for_series "$SERIES")"
 WEBKIT_INVISIBLE_PATCH="$(webkit_invisible_patch_for_series "$SERIES")"
 WEBKIT_GTK_API_PATCH="$REPO_ROOT/patches/webkit-165269-navigator-webdriver-gtk-api.patch"
@@ -115,10 +115,13 @@ if [[ ! -f "$PATCH" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$WEBKIT_INTERACTIONS_PATCH" || ! -f "$WEBKIT_POLICY_PATCH" ]]; then
-  echo "error: missing WebKit source patch" >&2
-  exit 1
-fi
+for _webkit_patch in "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH"; do
+  if [[ -n "$_webkit_patch" && ! -f "$_webkit_patch" ]]; then
+    echo "error: missing WebKit source patch: $_webkit_patch" >&2
+    exit 1
+  fi
+done
+unset _webkit_patch
 if [[ ! -f "$WEBKIT_GTK_API_PATCH" || ! -f "$WEBKIT_INVISIBLE_PATCH" ]]; then
   echo "error: missing WebKit GTK/invisible patch" >&2
   exit 1
@@ -266,8 +269,16 @@ run_dpkg_buildpackage() {
 
 RULES_PATCH_SHA256="$(sha256sum "$PATCH" | awk '{print $1}')"
 CMAKE_PATCH_SHA256="$(sha256sum "$CMAKE_PATCH" | awk '{print $1}')"
-WEBKIT_PATCH_SHA256="$(cat "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" "$WEBKIT_GTK_API_PATCH" "$WEBKIT_INVISIBLE_PATCH" | sha256sum | awk '{print $1}')"
-PATCH_SHA256="$(cat "$PATCH" "$CMAKE_PATCH" "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" "$WEBKIT_GTK_API_PATCH" "$WEBKIT_INVISIBLE_PATCH" | sha256sum | awk '{print $1}')"
+hash_existing_files() {
+  local f
+  for f in "$@"; do
+    [[ -n "$f" && -f "$f" ]] || continue
+    cat "$f"
+  done | sha256sum | awk '{print $1}'
+}
+
+WEBKIT_PATCH_SHA256="$(hash_existing_files "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" "$WEBKIT_GTK_API_PATCH" "$WEBKIT_INVISIBLE_PATCH")"
+PATCH_SHA256="$(hash_existing_files "$PATCH" "$CMAKE_PATCH" "$WEBKIT_INTERACTIONS_PATCH" "$WEBKIT_POLICY_PATCH" "$WEBKIT_GTK_API_PATCH" "$WEBKIT_INVISIBLE_PATCH")"
 
 apply_rules_patch() {
   echo "==> applying $PATCH"
@@ -292,6 +303,7 @@ revert_cmake_patch_if_applied() {
 
 apply_source_patch() {
   local patch="$1"
+  [[ -n "$patch" && -f "$patch" ]] || return 0
   if patch -p1 --dry-run < "$patch" >/dev/null 2>&1; then
     echo "==> applying $patch"
     patch -p1 < "$patch"
@@ -516,7 +528,33 @@ marker_matches() {
   return 1
 }
 
+archive_webkit_source_version() {
+  "$REPO_ROOT/scripts/upstream-webkit-version.sh" "$SERIES"
+}
+
+# Work-cache keys do not include the Debian revision. Drop a restored tree
+# when the archive source has moved (2.52.6 tree vs 2.54.0 source).
+drop_tree_if_archive_version_moved() {
+  local version upstream base
+  version="$(archive_webkit_source_version)" || {
+    echo "warning: could not read archive webkit2gtk version; keeping $SRC_DIR" >&2
+    return 0
+  }
+  upstream="${version%%-*}"
+  base="$(basename "$SRC_DIR")"
+  if [[ "$base" == "webkit2gtk-${upstream}" ]]; then
+    return 0
+  fi
+  echo "==> archive webkit2gtk is $version; discarding $base"
+  rm -rf "$WORK_DIR"
+  mkdir -p "$WORK_DIR"
+  SRC_DIR=""
+}
+
 SRC_DIR="$(find_src_dir)"
+if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]] && marker_matches "$SRC_DIR"; then
+  drop_tree_if_archive_version_moved
+fi
 if [[ -n "$SRC_DIR" && -d "$SRC_DIR" ]] && marker_matches "$SRC_DIR"; then
   stored_webkit="$(marker_webkit_patch_sha256 "$SRC_DIR" || true)"
   if [[ -n "$stored_webkit" && "$stored_webkit" != "$WEBKIT_PATCH_SHA256" ]]; then
@@ -682,8 +720,17 @@ post_prepare_build_state() {
   fi
 }
 
+install_source_build_deps() {
+  # apt-get build-dep <name> follows the newest archive source. The unpacked
+  # tree can be older (or newer) and list different Build-Depends, which
+  # dpkg-checkbuilddeps then rejects (trixie: libwoff-dev on 2.52 vs 2.54).
+  echo "==> apt-get build-dep from unpacked debian/control ($SRC_DIR)"
+  apt_get build-dep -y "$SRC_DIR"
+}
+
 run_compile_stage() {
   local stage
+  install_source_build_deps
   stage="$(marker_stage "$SRC_DIR" || true)"
   # override_dh_auto_configure (install manifests) only runs during debian/rules build.
   # dpkg-buildpackage -b -nc goes straight to binary and never regenerates *.install.
@@ -703,6 +750,7 @@ run_compile_stage() {
 }
 
 run_package_stage() {
+  install_source_build_deps
   # Ensure system JSC/GTK are on disk for dpkg-shlibdeps (webdriver links system JSC).
   echo "==> ensuring runtime libs for dpkg-shlibdeps (libjavascriptcoregtk-6.0-1)"
   apt_get install -y --no-install-recommends \

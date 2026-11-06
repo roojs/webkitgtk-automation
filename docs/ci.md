@@ -84,7 +84,9 @@ git tag build-trixie-$(date +%Y%m%d)
 git push origin build-trixie-$(date +%Y%m%d)
 ```
 
-Workflow: **Build libwebkitgtk-6.0 (Debian 13 trixie)** (`.github/workflows/build-trixie.yml`). Pin: `2.52.6-1~deb13u1`. Apt cache under `.ci-cache/apt-trixie`.
+Workflow: **Build libwebkitgtk-6.0 (Debian 13 trixie)** (`.github/workflows/build-trixie.yml`). Current archive source is `2.54.0-1~deb13u3` (trixie-security; `Sources.xz`). Apt cache under `.ci-cache/apt-trixie`.
+
+GitHub-hosted jobs are stopped at **6 hours** even though the workflow timeout is longer. Compile that is still running is cancelled, the partial `work/` tree is saved, and the next run resumes it. That is what happened to the 26.10 stonking build.
 
 ## Optional apt utilities (not part of pretest or build workflows)
 

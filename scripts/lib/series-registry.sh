@@ -67,11 +67,23 @@ build_release_tag() {
   echo "build-${series}-$(date +%Y%m%d)"
 }
 
+webkit_interactions_patch_for_series() {
+  local series="$1" root
+  root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+  case "$series" in
+    # 2.54 already compiles WebDriver interactions with ENABLE_WEBDRIVER off.
+    trixie) ;;
+    *) echo "$root/patches/webkit-318171-webdriver-interactions.patch" ;;
+  esac
+}
+
 webkit_policy_patch_for_series() {
   local series="$1" root
   root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
   case "$series" in
     plucky) echo "$root/patches/webkit-165269-navigator-webdriver-policy-2.50.patch" ;;
+    # 2.54 already has NavigatorWebDriverActivePolicy.
+    trixie) ;;
     *) echo "$root/patches/webkit-165269-navigator-webdriver-policy.patch" ;;
   esac
 }

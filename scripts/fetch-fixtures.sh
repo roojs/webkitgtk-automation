@@ -32,29 +32,48 @@ launchpad_orig_tar_url() {
 debian_pool_debian_tar_url() {
   local version="$1"
   echo "http://deb.debian.org/debian/pool/main/w/webkit2gtk/webkit2gtk_${version}.debian.tar.xz"
+  echo "http://deb.debian.org/debian-security/pool/updates/main/w/webkit2gtk/webkit2gtk_${version}.debian.tar.xz"
 }
 
 debian_pool_orig_tar_url() {
   local version="$1"
   local upstream="${version%%-*}"
   echo "http://deb.debian.org/debian/pool/main/w/webkit2gtk/webkit2gtk_${upstream}.orig.tar.xz"
+  echo "http://deb.debian.org/debian-security/pool/updates/main/w/webkit2gtk/webkit2gtk_${upstream}.orig.tar.xz"
 }
 
-debian_tar_url_for() {
-  local series="$1" version="$2"
+curl_first_url() {
+  local dest="$1"
+  shift
+  local url
+  for url in "$@"; do
+    echo "==> try $url" >&2
+    if curl -fsSL --globoff "$url" -o "$dest"; then
+      return 0
+    fi
+    rm -f "$dest"
+  done
+  echo "error: none of the URLs could be downloaded" >&2
+  return 1
+}
+
+download_debian_tar() {
+  local series="$1" version="$2" dest="$3"
   if [[ "$series" == "trixie" ]]; then
-    debian_pool_debian_tar_url "$version"
+    # shellcheck disable=SC2046
+    curl_first_url "$dest" $(debian_pool_debian_tar_url "$version")
   else
-    launchpad_debian_tar_url "$version"
+    curl -fsSL "$(launchpad_debian_tar_url "$version")" -o "$dest"
   fi
 }
 
-orig_tar_url_for() {
-  local series="$1" version="$2"
+download_orig_tar() {
+  local series="$1" version="$2" dest="$3"
   if [[ "$series" == "trixie" ]]; then
-    debian_pool_orig_tar_url "$version"
+    # shellcheck disable=SC2046
+    curl_first_url "$dest" $(debian_pool_orig_tar_url "$version")
   else
-    launchpad_orig_tar_url "$version"
+    curl -fsSL "$(launchpad_orig_tar_url "$version")" -o "$dest"
   fi
 }
 
@@ -70,10 +89,9 @@ fetch_debian_rules_fixture() {
     return 0
   fi
 
-  url="$(debian_tar_url_for "$series" "$version")"
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-debian-fixture.XXXXXX")"
-  echo "==> fetching debian.tar only: $url"
-  curl -fsSL "$url" -o "$tmp/debian.tar.xz"
+  echo "==> fetching debian.tar for $series $version"
+  download_debian_tar "$series" "$version" "$tmp/debian.tar.xz"
   mkdir -p "$dir"
   rm -rf "$dir/debian"
   tar -xJf "$tmp/debian.tar.xz" -C "$dir"
@@ -93,10 +111,9 @@ fetch_webkit_source_fixture() {
     return 0
   fi
 
-  url="$(orig_tar_url_for "$series" "$version")"
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-orig-fixture.XXXXXX")"
-  echo "==> fetching orig.tar (extract selected paths only): $url"
-  curl -fsSL "$url" -o "$tmp/orig.tar.xz"
+  echo "==> fetching orig.tar for $series $version (extract selected paths only)"
+  download_orig_tar "$series" "$version" "$tmp/orig.tar.xz"
 
   rm -rf "$dir"
   mkdir -p "$dir"

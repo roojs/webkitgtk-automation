@@ -26,17 +26,37 @@ fi
 PACKAGE="${PACKAGE:-webkit2gtk}"
 UPSTREAM_CURL_RETRIES="${UPSTREAM_CURL_RETRIES:-4}"
 
-sources_index_url() {
-  local pocket="$1" base="$ARCHIVE_BASE"
+sources_index_base() {
+  local pocket="$1"
   if [[ "$pocket" == *-security && -n "$ARCHIVE_SECURITY_BASE" ]]; then
-    base="$ARCHIVE_SECURITY_BASE"
+    echo "$ARCHIVE_SECURITY_BASE"
+    return 0
   fi
-  printf '%s/dists/%s/main/source/Sources.gz' "$base" "$pocket"
+  echo "$ARCHIVE_BASE"
+}
+
+# Debian security dropped Sources.gz; the same index is published as Sources.xz.
+pick_sources_url() {
+  local pocket="$1" base url
+  base="$(sources_index_base "$pocket")"
+  for url in \
+    "${base}/dists/${pocket}/main/source/Sources.gz" \
+    "${base}/dists/${pocket}/main/source/Sources.xz"
+  do
+    if curl -fsI -s -o /dev/null --retry 0 "$url"; then
+      echo "$url"
+      return 0
+    fi
+  done
+  return 1
 }
 
 cache_file_for() {
-  local pocket="$1"
-  printf '%s/%s-main.sources' "${UPSTREAM_SOURCES_CACHE_DIR:?}" "$pocket"
+  local pocket="$1" url="$2" ext="gz"
+  if [[ "$url" == *.xz ]]; then
+    ext="xz"
+  fi
+  printf '%s/%s-main.sources.%s' "${UPSTREAM_SOURCES_CACHE_DIR:?}" "$pocket" "$ext"
 }
 
 read_cache_entry() {
@@ -55,13 +75,15 @@ EOF
 }
 
 curl_retry() {
-  local attempt=1 max="$UPSTREAM_CURL_RETRIES"
+  local attempt=1 max="$UPSTREAM_CURL_RETRIES" rc
   while [[ "$attempt" -le "$max" ]]; do
     if "$@"; then
       return 0
     fi
-    if [[ "$attempt" -eq "$max" ]]; then
-      return 1
+    rc=$?
+    # 22 is HTTP 4xx (missing pocket). Retrying does not create the file.
+    if [[ "$rc" -eq 22 || "$attempt" -eq "$max" ]]; then
+      return "$rc"
     fi
     sleep $((attempt * 2))
     attempt=$((attempt + 1))
@@ -73,19 +95,28 @@ index_last_modified() {
   curl_retry curl -fsSI "$url" | awk 'tolower($1) == "last-modified:" { $1=""; sub(/^ /, ""); print; exit }'
 }
 
-versions_from_sources_gz() {
-  local url="$1"
-  curl_retry curl -fsSL "$url" | gzip -dc \
-    | awk -v pkg="$PACKAGE" '
+versions_from_sources_url() {
+  local url="$1" tmp
+  tmp="$(mktemp)"
+  if ! curl_retry curl -fsSL "$url" -o "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  if [[ "$url" == *.xz ]]; then
+    xz -dc "$tmp"
+  else
+    gzip -dc "$tmp"
+  fi | awk -v pkg="$PACKAGE" '
         /^Package: / { cur = $2 }
         cur == pkg && /^Version: / { print $2 }
       '
+  rm -f "$tmp"
 }
 
 newest_version_from_url() {
   local url="$1"
   local -a versions
-  mapfile -t versions < <(versions_from_sources_gz "$url")
+  mapfile -t versions < <(versions_from_sources_url "$url")
   if ((${#versions[@]} == 0)); then
     echo "error: $PACKAGE not found in $url" >&2
     return 1
@@ -97,10 +128,13 @@ version_from_index() {
   local pocket="$1"
   local url last_modified cached_lm cached_version version cache_path
 
-  url="$(sources_index_url "$pocket")"
+  if ! url="$(pick_sources_url "$pocket")"; then
+    echo "error: no Sources index for pocket $pocket" >&2
+    return 1
+  fi
   cache_path=""
   if [[ -n "${UPSTREAM_SOURCES_CACHE_DIR:-}" ]]; then
-    cache_path="$(cache_file_for "$pocket")"
+    cache_path="$(cache_file_for "$pocket" "$url")"
   fi
 
   if [[ -n "$cache_path" ]]; then
