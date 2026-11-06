@@ -167,7 +167,15 @@ export DEBIAN_FRONTEND=noninteractive
 
 # devscripts/pbuilder postinst prompts for a mirror in non-interactive CI/shells.
 preseed_pbuilder_mirror() {
-  local mirror="${PBUILDER_MIRROR:-http://archive.ubuntu.com/ubuntu}"
+  local mirror="${PBUILDER_MIRROR:-}"
+  if [[ -z "$mirror" && -r /etc/os-release ]]; then
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    if [[ "${ID:-}" == "debian" ]]; then
+      mirror="http://deb.debian.org/debian"
+    fi
+  fi
+  mirror="${mirror:-http://archive.ubuntu.com/ubuntu}"
   if command -v debconf-set-selections >/dev/null 2>&1; then
     echo "pbuilder pbuilder/default_mirror string $mirror" | "${SUDO[@]}" debconf-set-selections
     echo "pbuilder pbuilder/override_mirror boolean false" | "${SUDO[@]}" debconf-set-selections
@@ -408,16 +416,24 @@ if [[ "$APT_UPGRADE" == "1" ]]; then
   apt_get upgrade -y
 fi
 
-apt_get install -y \
-  devscripts \
-  fakeroot \
-  quilt \
-  dpkg-dev \
-  ubuntu-dev-tools \
-  patch \
-  ca-certificates \
-  ccache \
+install_pkgs=(
+  devscripts
+  fakeroot
+  quilt
+  dpkg-dev
+  patch
+  ca-certificates
+  ccache
   binutils-gold
+)
+if [[ -r /etc/os-release ]]; then
+  # shellcheck disable=SC1091
+  . /etc/os-release
+  if [[ "${ID:-}" == "ubuntu" ]]; then
+    install_pkgs+=(ubuntu-dev-tools)
+  fi
+fi
+apt_get install -y "${install_pkgs[@]}"
 
 enable_deb_src() {
   local changed=0
@@ -446,14 +462,17 @@ enable_deb_src() {
 enable_deb_src
 
 if [[ "$STAGE_MODE" != "package" && -n "${GITHUB_ACTIONS:-}${CI_BUILD_LIMITS:-}" ]]; then
-  # shellcheck source=.github/scripts/align-libx11-for-builddep.sh
-  source "$REPO_ROOT/.github/scripts/align-libx11-for-builddep.sh"
-  align_libx11_for_builddep "$SERIES"
   mapfile -t _held_back < <(apt-get -s upgrade 2>/dev/null | awk '/^Inst / { print $2 }' | sort -u)
   if ((${#_held_back[@]} > 0)); then
     echo "==> installing ${#_held_back[@]} held-back apt upgrades before build-dep: ${_held_back[*]}"
     apt_get install -y --allow-downgrades "${_held_back[@]}" || true
   fi
+  # shellcheck source=.github/scripts/align-libx11-for-builddep.sh
+  source "$REPO_ROOT/.github/scripts/align-libx11-for-builddep.sh"
+  align_libx11_for_builddep "$SERIES"
+  # shellcheck source=.github/scripts/align-exact-runtime-deps.sh
+  source "$REPO_ROOT/.github/scripts/align-exact-runtime-deps.sh"
+  align_exact_runtime_deps_for_builddep "$SERIES"
 fi
 
 if [[ "$STAGE_MODE" != "package" ]]; then

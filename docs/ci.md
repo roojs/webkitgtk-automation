@@ -7,6 +7,7 @@ noble=soup3-gtk4:enable-webdriver-gtk4-soup3.patch
 questing=soup3-gtk4:enable-webdriver-gtk4-soup3.patch
 resolute=gtk3-gtk4:enable-webdriver-gtk4.patch
 stonking=gtk3-gtk4:enable-webdriver-gtk4.patch
+trixie=gtk3-gtk4:enable-webdriver-gtk4-trixie.patch
 ```
 
 | Where | Series |
@@ -15,6 +16,7 @@ stonking=gtk3-gtk4:enable-webdriver-gtk4.patch
 | GitHub Actions — **questing** (`build-questing-*` tags) | **questing** (25.10) — noble runner upgraded in CI |
 | GitHub Actions — **resolute** (`build-resolute-*` tags) | **resolute** (26.04) — native on `ubuntu-26.04` |
 | GitHub Actions — **stonking** (`build-stonking-*` tags) | **stonking** (26.10) — `ubuntu-26.04` runner upgraded in CI |
+| GitHub Actions — **trixie** (`build-trixie-*` tags) | **Debian 13 trixie** — Ubuntu runner, build inside a trixie chroot |
 | Local | whatever you are running if listed in `.github/series-registry` |
 
 Install the `.deb` built for **your** Ubuntu series. A 25.10 package will not install on 25.04 (`libc6 >= 2.42`, exact `libjavascriptcoregtk-6.0-1` pin, `libxml2-16`).
@@ -69,7 +71,20 @@ Workflow: **Build libwebkitgtk-6.0 (26.10 stonking)** (`.github/workflows/build-
 
 Starts on `ubuntu-26.04` (resolute), dist-upgrades the runner to **stonking**, then builds natively. Apt cache under `.ci-cache/apt-stonking`.
 
+Before `build-dep`, CI downgrades runtimes that `-dev` packages pin exactly (`libx11-6`, `libbz2-1.0`, and any later pin of the same kind). That is what was failing stonking verify after libx11 itself was aligned.
+
 When a workflow finishes, the `.deb`s are on that tag's **Release**.
+
+## Debian 13 (trixie) — separate workflow
+
+Not part of the Ubuntu monitor. The runner stays Ubuntu so the Actions agent keeps working. `prepare-debian-chroot.sh` bootstraps trixie and `run-in-debian-chroot.sh` runs `./build.sh` there (`VERSION_CODENAME=trixie`).
+
+```bash
+git tag build-trixie-$(date +%Y%m%d)
+git push origin build-trixie-$(date +%Y%m%d)
+```
+
+Workflow: **Build libwebkitgtk-6.0 (Debian 13 trixie)** (`.github/workflows/build-trixie.yml`). Pin: `2.52.6-1~deb13u1`. Apt cache under `.ci-cache/apt-trixie`.
 
 ## Optional apt utilities (not part of pretest or build workflows)
 

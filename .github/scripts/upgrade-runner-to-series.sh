@@ -428,6 +428,9 @@ main() {
   # shellcheck source=.github/scripts/align-libx11-for-builddep.sh
   source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/align-libx11-for-builddep.sh"
   align_libx11_for_builddep "$TARGET_SERIES"
+  # shellcheck source=.github/scripts/align-exact-runtime-deps.sh
+  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/align-exact-runtime-deps.sh"
+  align_exact_runtime_deps_for_builddep "$TARGET_SERIES"
 
   echo "==> upgrade-runner-to-series done ($(host_series))"
 }

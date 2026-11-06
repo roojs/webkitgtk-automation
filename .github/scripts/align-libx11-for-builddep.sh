@@ -15,7 +15,16 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 
 depends_libx11_6_pin_from_show() {
-  sed -n 's/^Depends:.*libx11-6 (= \([^)]*\)).*/\1/p;q'
+  # Do not quit on the first line: apt-cache show starts with "Package:".
+  awk '
+    /^Depends:/ && /libx11-6 \(= / {
+      line = $0
+      sub(/.*libx11-6 \(= /, "", line)
+      sub(/\).*/, "", line)
+      print line
+      exit
+    }
+  '
 }
 
 archive_libx11_dev_runtime_pin() {

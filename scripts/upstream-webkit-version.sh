@@ -16,12 +16,22 @@ set -euo pipefail
 
 SERIES="${1:-resolute}"
 ARCHIVE_BASE="${ARCHIVE_BASE:-http://archive.ubuntu.com/ubuntu}"
+ARCHIVE_SECURITY_BASE="${ARCHIVE_SECURITY_BASE:-}"
+# Debian series are not on archive.ubuntu.com. Leave the Ubuntu default unless
+# the caller already pointed ARCHIVE_BASE somewhere else.
+if [[ "$SERIES" == "trixie" && "$ARCHIVE_BASE" == "http://archive.ubuntu.com/ubuntu" ]]; then
+  ARCHIVE_BASE="http://deb.debian.org/debian"
+  ARCHIVE_SECURITY_BASE="${ARCHIVE_SECURITY_BASE:-http://deb.debian.org/debian-security}"
+fi
 PACKAGE="${PACKAGE:-webkit2gtk}"
 UPSTREAM_CURL_RETRIES="${UPSTREAM_CURL_RETRIES:-4}"
 
 sources_index_url() {
-  local pocket="$1"
-  printf '%s/dists/%s/main/source/Sources.gz' "$ARCHIVE_BASE" "$pocket"
+  local pocket="$1" base="$ARCHIVE_BASE"
+  if [[ "$pocket" == *-security && -n "$ARCHIVE_SECURITY_BASE" ]]; then
+    base="$ARCHIVE_SECURITY_BASE"
+  fi
+  printf '%s/dists/%s/main/source/Sources.gz' "$base" "$pocket"
 }
 
 cache_file_for() {

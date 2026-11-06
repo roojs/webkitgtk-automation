@@ -95,11 +95,31 @@ test_shell_syntax() {
     "$REPO_ROOT/.github/scripts/strip-third-party-apt-sources.sh" \
     "$REPO_ROOT/.github/scripts/normalize-runner-apt-sources.sh" \
     "$REPO_ROOT/.github/scripts/record-successful-build.sh" \
-    "$REPO_ROOT/.github/scripts/align-libx11-for-builddep.sh"
+    "$REPO_ROOT/.github/scripts/align-libx11-for-builddep.sh" \
+    "$REPO_ROOT/.github/scripts/align-exact-runtime-deps.sh" \
+    "$REPO_ROOT/.github/scripts/prepare-debian-chroot.sh" \
+    "$REPO_ROOT/.github/scripts/run-in-debian-chroot.sh"
   do
     bash -n "$f" || fail "bash -n $f"
     pass "$(basename "$f")"
   done
+}
+
+test_exact_pin_parser() {
+  echo "==> exact runtime pin parser (apt solver log)"
+  local log pins
+  log="$(mktemp)"
+  cat >"$log" <<'EOF'
+E: Unable to satisfy dependencies. Reached two conflicting assignments:
+   2. libbz2-dev:amd64 Depends libbz2-1.0 (= 1.0.8-6build2)
+      - libbz2-1.0:amd64=1.0.8-6build2 is not selected for install
+EOF
+  # shellcheck source=.github/scripts/align-exact-runtime-deps.sh
+  source "$REPO_ROOT/.github/scripts/align-exact-runtime-deps.sh"
+  pins="$(exact_pins_from_solver_log "$log")"
+  rm -f "$log"
+  [[ "$pins" == "libbz2-1.0:amd64=1.0.8-6build2" ]] || fail "parser got: ${pins:-<empty>}"
+  pass "libbz2 exact pin"
 }
 
 test_align_libx11_pin_in_subshell() {
@@ -533,6 +553,7 @@ main() {
 
   install_test_deps
   test_shell_syntax
+  test_exact_pin_parser
   test_align_libx11_pin_in_subshell
   test_compile_cache_key_pipefail
   test_marker_matching

@@ -29,6 +29,35 @@ launchpad_orig_tar_url() {
   echo "https://launchpad.net/ubuntu/+archive/primary/+sourcefiles/webkit2gtk/${version}/webkit2gtk_${upstream}.orig.tar.xz"
 }
 
+debian_pool_debian_tar_url() {
+  local version="$1"
+  echo "http://deb.debian.org/debian/pool/main/w/webkit2gtk/webkit2gtk_${version}.debian.tar.xz"
+}
+
+debian_pool_orig_tar_url() {
+  local version="$1"
+  local upstream="${version%%-*}"
+  echo "http://deb.debian.org/debian/pool/main/w/webkit2gtk/webkit2gtk_${upstream}.orig.tar.xz"
+}
+
+debian_tar_url_for() {
+  local series="$1" version="$2"
+  if [[ "$series" == "trixie" ]]; then
+    debian_pool_debian_tar_url "$version"
+  else
+    launchpad_debian_tar_url "$version"
+  fi
+}
+
+orig_tar_url_for() {
+  local series="$1" version="$2"
+  if [[ "$series" == "trixie" ]]; then
+    debian_pool_orig_tar_url "$version"
+  else
+    launchpad_orig_tar_url "$version"
+  fi
+}
+
 fetch_debian_rules_fixture() {
   local series="$1" version="$2"
   local dir rules version_file url tmp
@@ -41,7 +70,7 @@ fetch_debian_rules_fixture() {
     return 0
   fi
 
-  url="$(launchpad_debian_tar_url "$version")"
+  url="$(debian_tar_url_for "$series" "$version")"
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-debian-fixture.XXXXXX")"
   echo "==> fetching debian.tar only: $url"
   curl -fsSL "$url" -o "$tmp/debian.tar.xz"
@@ -64,7 +93,7 @@ fetch_webkit_source_fixture() {
     return 0
   fi
 
-  url="$(launchpad_orig_tar_url "$version")"
+  url="$(orig_tar_url_for "$series" "$version")"
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-orig-fixture.XXXXXX")"
   echo "==> fetching orig.tar (extract selected paths only): $url"
   curl -fsSL "$url" -o "$tmp/orig.tar.xz"

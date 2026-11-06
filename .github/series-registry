@@ -8,3 +8,4 @@ plucky=soup3-gtk4:enable-webdriver-gtk4-soup3.patch
 questing=soup3-gtk4:enable-webdriver-gtk4-soup3.patch
 resolute=gtk3-gtk4:enable-webdriver-gtk4.patch
 stonking=gtk3-gtk4:enable-webdriver-gtk4.patch
+trixie=gtk3-gtk4:enable-webdriver-gtk4-trixie.patch
