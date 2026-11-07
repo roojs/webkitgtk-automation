@@ -264,7 +264,7 @@ jobs:
             TITLE="${TRIGGER_TAG} (${VERSION})"
           else
             # Manual run: version-derived release tag (sanitize + for GitHub).
-            RELEASE_TAG="webkit2gtk-${VERSION//+/-}"
+            RELEASE_TAG="webkit2gtk-$(printf '%s' "$VERSION" | tr '+~' '--')"
             TITLE="webkit2gtk-${VERSION}"
           fi
 

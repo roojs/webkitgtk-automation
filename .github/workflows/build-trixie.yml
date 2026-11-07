@@ -257,7 +257,8 @@ jobs:
             RELEASE_TAG="${TRIGGER_TAG}"
             TITLE="${TRIGGER_TAG} (${VERSION})"
           else
-            RELEASE_TAG="webkit2gtk-${VERSION//+/-}"
+            # Debian revisions use ~ (1~deb13u3); git tags reject ~.
+            RELEASE_TAG="webkit2gtk-$(printf '%s' "$VERSION" | tr '+~' '--')"
             TITLE="webkit2gtk-${VERSION}"
           fi
 
