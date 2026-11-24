@@ -119,6 +119,40 @@ dpkg_version_lt() {
   dpkg --compare-versions "$a" lt "$b"
 }
 
+# Lines are "<epoch> <status> <conclusion>". Echoes active, success, failed, or none.
+# An in-progress run wins. A success after the mark wins over a later failure.
+classify_workflow_runs_since() {
+  local since="$1" line epoch status conclusion saw_success=0 saw_failed=0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -n "$line" ]] || continue
+    epoch="${line%% *}"
+    conclusion="${line##* }"
+    status="${line#* }"
+    status="${status%% *}"
+    [[ "$epoch" =~ ^[0-9]+$ ]] || continue
+    [[ "$epoch" -ge "$since" ]] || continue
+    case "$status" in
+      queued|in_progress|waiting|pending|requested|action_required)
+        echo active
+        return 0
+        ;;
+    esac
+    case "$conclusion" in
+      success) saw_success=1 ;;
+      failure|cancelled) saw_failed=1 ;;
+    esac
+  done
+  if [[ "$saw_success" == 1 ]]; then
+    echo success
+    return 0
+  fi
+  if [[ "$saw_failed" == 1 ]]; then
+    echo failed
+    return 0
+  fi
+  echo none
+}
+
 # Git refs reject ~ (Debian revisions such as 1~deb13u1). + is our package suffix.
 sanitize_tag_suffix() {
   echo "$1" | tr '+/~' '---'

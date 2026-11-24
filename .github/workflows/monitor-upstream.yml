@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: webkitgtk-monitor-upstream
@@ -42,6 +43,7 @@ jobs:
 
       - name: Monitor upstream and queue build if needed
         env:
+          GH_TOKEN: ${{ github.token }}
           DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '0' }}
           FORCE_BUILD: ${{ github.event.inputs.force_build == 'true' && '1' || '0' }}
           UPSTREAM_SOURCES_CACHE_DIR: .cache/upstream-sources

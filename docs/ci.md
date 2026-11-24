@@ -119,8 +119,11 @@ Native build flow (series-specific runner setup differs):
 **Upstream:** the daily **Monitor upstream webkit2gtk** workflow reads archive
 `Sources` for **plucky, questing, resolute, stonking, and trixie** (and syncs **noble** pins only).
 When the archive publishes a newer source than we last built for a series, it syncs
-`.github/pinned-webkit-version`, runs pretest, and pushes a
-`build-<series>-upstream-*` tag. No manual pin bump.
+`.github/pinned-webkit-version`, runs pretest, pushes a
+`build-<series>-upstream-*` tag, and dispatches that series' build workflow.
+A tag push from the monitor does not start the build by itself. The next monitor
+run also dispatches a build when that tag exists and no build run followed it.
+No manual pin bump.
 
 Builds fetch the series row from `.github/pinned-webkit-version` (kept in sync with
 archive by the monitor). The CI image’s preinstalled CMake 4.4.x is removed;

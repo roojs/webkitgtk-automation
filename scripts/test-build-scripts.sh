@@ -522,6 +522,22 @@ test_tracked_upstream_version() {
   pass "tracked upstream helpers"
 }
 
+test_classify_workflow_runs_since() {
+  echo "==> classify workflow runs since a tag"
+  local out
+  out="$(printf '%s\n' '10 completed success' | classify_workflow_runs_since 100)"
+  [[ "$out" == "none" ]] || fail "runs before the tag must be ignored: $out"
+  out="$(printf '%s\n' '200 in_progress none' '150 completed success' | classify_workflow_runs_since 100)"
+  [[ "$out" == "active" ]] || fail "in-progress run must win: $out"
+  out="$(printf '%s\n' '150 completed failure' '180 completed success' | classify_workflow_runs_since 100)"
+  [[ "$out" == "success" ]] || fail "success must win over failure: $out"
+  out="$(printf '%s\n' '150 completed failure' | classify_workflow_runs_since 100)"
+  [[ "$out" == "failed" ]] || fail "failure must requeue: $out"
+  out="$(printf '%s\n' | classify_workflow_runs_since 100)"
+  [[ "$out" == "none" ]] || fail "no runs must dispatch: $out"
+  pass "workflow run classification"
+}
+
 test_upstream_version_probe() {
   echo "==> upstream webkit2gtk version probe"
   local ver
@@ -572,6 +588,7 @@ main() {
   test_debian_fixture_ready
   test_pinned_webkit_version
   test_tracked_upstream_version
+  test_classify_workflow_runs_since
   test_packaging_flow
   test_work_cache_roundtrip
   test_work_cache_refuses_corrupt_tree

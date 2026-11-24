@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Follow archive webkit2gtk for CI series (Ubuntu and Debian trixie): sync pins, pretest, push build tags.
+# Follow archive webkit2gtk for CI series (Ubuntu and Debian trixie): sync pins, pretest,
+# push build tags, and dispatch the series build workflow.
+# A tag push made with the workflow token does not start another workflow.
 #
 # Usage (CI):
 #   ./scripts/monitor-upstream-build.sh
@@ -46,26 +48,60 @@ commit_and_push() {
   local message="$1"
   shift
   git add "$@"
+  if git diff --staged --quiet; then
+    echo "==> no state change to commit"
+    return 0
+  fi
   git config user.name "github-actions[bot]"
   git config user.email "github-actions[bot]@users.noreply.github.com"
   git commit -m "$message"
   git push origin HEAD
 }
 
-pending_build_failed() {
-  local series="$1" tag="$2"
-  command -v gh >/dev/null 2>&1 || return 1
-  local conclusion
-  conclusion="$(
-    gh run list \
-      --workflow "build-${series}.yml" \
-      --event push \
-      --branch "$tag" \
-      --limit 1 \
-      --json conclusion \
-      -q '.[0].conclusion' 2>/dev/null || true
-  )"
-  [[ "$conclusion" == "failure" || "$conclusion" == "cancelled" ]]
+# active | success | failed | none, for runs of build-<series>.yml created at or after the tag.
+build_state_since_tag() {
+  local series="$1" tag="$2" since line created status conclusion epoch runs
+  if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+    echo none
+    return 0
+  fi
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "error: gh is required to see whether build-${series}.yml is running" >&2
+    return 1
+  fi
+  since="$(date -d "$(git log -1 --format=%cI "$tag")" +%s)"
+  runs="$(mktemp)"
+  gh run list \
+    --workflow "build-${series}.yml" \
+    --limit 30 \
+    --json createdAt,status,conclusion \
+    -q '.[] | "\(.createdAt) \(.status) \(.conclusion // "none")"' >"$runs"
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -n "$line" ]] || continue
+    created="${line%% *}"
+    conclusion="${line##* }"
+    status="${line#* }"
+    status="${status%% *}"
+    epoch="$(date -d "$created" +%s)"
+    printf '%s %s %s\n' "$epoch" "$status" "$conclusion"
+  done <"$runs" | classify_workflow_runs_since "$since"
+  rm -f "$runs"
+}
+
+dispatch_series_build() {
+  local series="$1" tag="$2" workflow
+  workflow="build-${series}.yml"
+  if [[ "${DRY_RUN:-}" == "1" ]]; then
+    echo "==> DRY_RUN=1: would dispatch $workflow for $tag"
+    return 0
+  fi
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "error: gh is required to dispatch $workflow" >&2
+    return 1
+  fi
+  echo "==> dispatching $workflow on main for $tag"
+  gh workflow run "$workflow" --ref main
+  echo "==> dispatched $workflow"
 }
 
 sync_pin_if_needed() {
@@ -106,14 +142,26 @@ process_build_series() {
     need_build=1
   elif [[ "$current" == "$pending" ]]; then
     tag="$(upstream_build_tag "$series" "$current")"
-    if pending_build_failed "$series" "$tag"; then
-      echo "==> [$series] pending build for $current failed; clearing pending to requeue"
-      clear_pending_upstream_version "$series"
-      pending=""
-    else
-      echo "==> [$series] build already queued for $current; waiting for CI"
-      return 0
-    fi
+    case "$(build_state_since_tag "$series" "$tag")" in
+      active|success)
+        echo "==> [$series] build already queued for $current; waiting for CI"
+        return 0
+        ;;
+      failed)
+        echo "==> [$series] pending build for $current failed; clearing pending to requeue"
+        clear_pending_upstream_version "$series"
+        pending=""
+        ;;
+      none)
+        echo "==> [$series] tag $tag has no build run; dispatching build-${series}.yml"
+        dispatch_series_build "$series" "$tag"
+        return 0
+        ;;
+      *)
+        echo "error: [$series] could not read build state for $tag" >&2
+        return 1
+        ;;
+    esac
   fi
 
   if [[ "$need_build" != "1" ]]; then
@@ -134,7 +182,7 @@ process_build_series() {
 
   if [[ "${DRY_RUN:-}" == "1" ]]; then
     tag="$(upstream_build_tag "$series" "$current")"
-    echo "==> DRY_RUN=1: would set pending=$current, commit state, and push tag $tag"
+    echo "==> DRY_RUN=1: would set pending=$current, commit state, push tag $tag, and dispatch build-${series}.yml"
     return 0
   fi
 
@@ -145,6 +193,7 @@ process_build_series() {
     echo "==> tag $tag already exists; marking pending=$current for $series"
     commit_and_push "Monitor: mark upstream webkit2gtk $current pending for $series (tag exists)" \
       "$PINNED_FILE" "$PENDING_FILE"
+    dispatch_series_build "$series" "$tag"
     return 0
   fi
 
@@ -153,7 +202,8 @@ process_build_series() {
 
   git tag -a "$tag" -m "Auto-build for upstream webkit2gtk $current (${series}, suffix ${SUFFIX})"
   git push origin "$tag"
-  echo "==> pushed $tag (triggers build workflow)"
+  echo "==> pushed $tag"
+  dispatch_series_build "$series" "$tag"
 }
 
 build_series=()
