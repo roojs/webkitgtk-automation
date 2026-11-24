@@ -119,12 +119,17 @@ dpkg_version_lt() {
   dpkg --compare-versions "$a" lt "$b"
 }
 
+# Git refs reject ~ (Debian revisions such as 1~deb13u1). + is our package suffix.
+sanitize_tag_suffix() {
+  echo "$1" | tr '+/~' '---'
+}
+
 monitor_build_series_list() {
   if [[ -n "${MONITOR_BUILD_SERIES:-}" ]]; then
     echo "$MONITOR_BUILD_SERIES"
     return 0
   fi
-  echo "plucky questing resolute stonking"
+  echo "plucky questing resolute stonking trixie"
 }
 
 monitor_pin_sync_series_list() {
@@ -132,5 +137,5 @@ monitor_pin_sync_series_list() {
     echo "$MONITOR_PIN_SYNC_SERIES"
     return 0
   fi
-  echo "noble plucky questing resolute stonking"
+  echo "noble plucky questing resolute stonking trixie"
 }

@@ -21,7 +21,7 @@ https://github.com/user-attachments/assets/c09be86e-9f71-42d1-82da-fc2a4adadb0a
 
 ## Install
 
-Packages: `libwebkitgtk-6.0-webdriver4` (runtime) and `libwebkitgtk-6.0-webdriver-dev` (pkg-config). Published for Ubuntu 25.04 (plucky), 25.10 (questing), 26.04 (resolute), and 26.10 (stonking) in the [roojs APT repository](https://roojs.github.io/repos/). Debian 13 (trixie) has its own workflow (`build-trixie-*`); see [docs/ci.md](docs/ci.md).
+Packages: `libwebkitgtk-6.0-webdriver4` (runtime) and `libwebkitgtk-6.0-webdriver-dev` (pkg-config). Published for Ubuntu 25.04 (plucky), 25.10 (questing), 26.04 (resolute), and 26.10 (stonking) in the [roojs APT repository](https://roojs.github.io/repos/). Debian 13 (trixie) is built in a trixie chroot and followed by the same upstream monitor (`build-trixie-*`); see [docs/ci.md](docs/ci.md).
 
 Add the signing key and sources file (replace `@suite@` with `lsb_release -cs`):
 

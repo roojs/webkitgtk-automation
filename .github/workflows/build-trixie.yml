@@ -1,8 +1,8 @@
 name: Build libwebkitgtk-6.0 (Debian 13 trixie)
 
-# Separate from the Ubuntu series builds. The GitHub runner stays Ubuntu.
-# prepare-debian-chroot.sh bootstraps Debian trixie and the compile runs there,
-# so SERIES matches the chroot's os-release. Not part of the Ubuntu upstream monitor.
+# The GitHub runner stays Ubuntu. prepare-debian-chroot.sh bootstraps Debian trixie
+# and the compile runs there, so SERIES matches the chroot's os-release.
+# The daily upstream monitor queues build-trixie-* tags the same way as Ubuntu series.
 # Trigger: build-trixie-* tags or workflow_dispatch.
 on:
   push:

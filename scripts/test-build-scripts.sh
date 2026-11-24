@@ -509,7 +509,16 @@ test_tracked_upstream_version() {
   tracked="$(TRACKED_UPSTREAM_VERSION_FILE="$tmp" read_tracked_upstream_version questing)"
   [[ "$tracked" == "2.52.3-0ubuntu0.25.10.1" ]] || fail "tracked read/write: $tracked"
   dpkg_version_lt "2.50.4-0ubuntu0.25.04.1" "2.52.3-0ubuntu0.25.10.1" || fail "dpkg_version_lt"
+  dpkg_version_lt "2.54.0-1~deb13u3" "2.54.3-1~deb13u1" || fail "dpkg_version_lt debian security"
   rm -f "$tmp"
+  local build_series pin_series tag
+  build_series="$(MONITOR_BUILD_SERIES= monitor_build_series_list)"
+  pin_series="$(MONITOR_PIN_SYNC_SERIES= monitor_pin_sync_series_list)"
+  [[ " $build_series " == *" trixie "* ]] || fail "monitor build series missing trixie: $build_series"
+  [[ " $pin_series " == *" trixie "* ]] || fail "monitor pin sync missing trixie: $pin_series"
+  tag="$(sanitize_tag_suffix '2.54.3-1~deb13u1')"
+  [[ "$tag" != *"~"* && "$tag" == "2.54.3-1-deb13u1" ]] || fail "sanitize debian revision: $tag"
+  git check-ref-format "refs/tags/build-trixie-upstream-$tag" || fail "tag not a valid ref: $tag"
   pass "tracked upstream helpers"
 }
 

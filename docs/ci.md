@@ -75,16 +75,16 @@ Before `build-dep`, CI downgrades runtimes that `-dev` packages pin exactly (`li
 
 When a workflow finishes, the `.deb`s are on that tag's **Release**.
 
-## Debian 13 (trixie) — separate workflow
+## Debian 13 (trixie)
 
-Not part of the Ubuntu monitor. The runner stays Ubuntu so the Actions agent keeps working. `prepare-debian-chroot.sh` bootstraps trixie and `run-in-debian-chroot.sh` runs `./build.sh` there (`VERSION_CODENAME=trixie`).
+The daily upstream monitor follows trixie the same way it follows the Ubuntu series: when Debian publishes a newer `webkit2gtk` source, it syncs the pin, runs pretest, and pushes a `build-trixie-upstream-*` tag. The runner stays Ubuntu so the Actions agent keeps working. `prepare-debian-chroot.sh` bootstraps trixie and `run-in-debian-chroot.sh` runs `./build.sh` there (`VERSION_CODENAME=trixie`).
 
 ```bash
 git tag build-trixie-$(date +%Y%m%d)
 git push origin build-trixie-$(date +%Y%m%d)
 ```
 
-Workflow: **Build libwebkitgtk-6.0 (Debian 13 trixie)** (`.github/workflows/build-trixie.yml`). Current archive source is `2.54.0-1~deb13u3` (trixie-security; `Sources.xz`). Apt cache under `.ci-cache/apt-trixie`.
+Workflow: **Build libwebkitgtk-6.0 (Debian 13 trixie)** (`.github/workflows/build-trixie.yml`). Source comes from trixie and trixie-security (`Sources.xz` on security). Apt cache under `.ci-cache/apt-trixie`. Debian revisions contain `~`; build tags map that to `-` because Git rejects `~` in refs.
 
 GitHub-hosted jobs are stopped at **6 hours** even though the workflow timeout is longer. Compile that is still running is cancelled, the partial `work/` tree is saved, and the next run resumes it. That is what happened to the 26.10 stonking build.
 
@@ -117,8 +117,8 @@ Native build flow (series-specific runner setup differs):
 9. Save apt / ccache; on success upload `.deb`s and publish a Release
 
 **Upstream:** the daily **Monitor upstream webkit2gtk** workflow reads archive
-`Sources` for **plucky, questing, resolute, and stonking** (and syncs **noble** pins only).
-When Ubuntu publishes a newer source than we last built for a series, it syncs
+`Sources` for **plucky, questing, resolute, stonking, and trixie** (and syncs **noble** pins only).
+When the archive publishes a newer source than we last built for a series, it syncs
 `.github/pinned-webkit-version`, runs pretest, and pushes a
 `build-<series>-upstream-*` tag. No manual pin bump.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Follow Ubuntu archive webkit2gtk for CI series: sync pins, pretest, push build tags.
+# Follow archive webkit2gtk for CI series (Ubuntu and Debian trixie): sync pins, pretest, push build tags.
 #
 # Usage (CI):
 #   ./scripts/monitor-upstream-build.sh
@@ -8,7 +8,7 @@
 #   SERIES              Optional single series (default: all in MONITOR_BUILD_SERIES)
 #   DRY_RUN=1           Log actions only; do not commit, tag, or push
 #   FORCE_BUILD=1       Build even when upstream matches tracked (pretest still required)
-#   MONITOR_BUILD_SERIES       Space-separated series to auto-build (default: plucky questing resolute stonking)
+#   MONITOR_BUILD_SERIES       Space-separated series to auto-build (default: plucky questing resolute stonking trixie)
 #   MONITOR_PIN_SYNC_SERIES    Space-separated series to sync in pinned-webkit-version (includes noble)
 set -euo pipefail
 
@@ -23,10 +23,6 @@ source "$REPO_ROOT/scripts/lib/series-registry.sh"
 PINNED_FILE="$(pinned_webkit_version_file)"
 PENDING_FILE="$(pending_upstream_version_file)"
 SUFFIX="${SUFFIX:-+webkitgtk1}"
-
-sanitize_tag_suffix() {
-  echo "$1" | tr '+/' '--'
-}
 
 upstream_build_tag() {
   local series="$1" version="$2"
