@@ -39,7 +39,7 @@ run_pretest() {
     echo "==> installing pretest deps"
     sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-      devscripts debhelper fakeroot zstd binutils-gold curl
+      devscripts debhelper fakeroot zstd binutils-gold curl debian-archive-keyring
   fi
   REFRESH=1 SERIES="$series" "$REPO_ROOT/scripts/run-pretest.sh" "$series"
 }
@@ -121,6 +121,7 @@ process_build_series() {
   local current pinned tracked pending need_build=0 tag
 
   current="$("$REPO_ROOT/scripts/upstream-webkit-version.sh" "$series")"
+  require_valid_webkit_version "$current" "archive webkit2gtk for $series"
   pinned="$(read_pinned_webkit_version "$series")"
   tracked="$(read_tracked_upstream_version "$series")"
   pending="$(read_pending_upstream_version "$series")"
@@ -220,6 +221,7 @@ for series in "${pin_series[@]}"; do
   [[ -n "$series" ]] || continue
   series_registered "$series" || continue
   current="$("$REPO_ROOT/scripts/upstream-webkit-version.sh" "$series")"
+  require_valid_webkit_version "$current" "archive webkit2gtk for $series"
   if sync_pin_if_needed "$series" "$current"; then
     pin_changed=1
   fi

@@ -14,6 +14,8 @@ source "$REPO_ROOT/scripts/lib/pinned-webkit-version.sh"
 source "$REPO_ROOT/scripts/lib/debian-rules-fixture.sh"
 # shellcheck source=scripts/lib/webkit-source-fixture.sh
 source "$REPO_ROOT/scripts/lib/webkit-source-fixture.sh"
+# shellcheck source=scripts/lib/debian-source-apt.sh
+source "$REPO_ROOT/scripts/lib/debian-source-apt.sh"
 
 REFRESH="${REFRESH:-0}"
 SERIES_ARG="${1:-}"
@@ -29,51 +31,63 @@ launchpad_orig_tar_url() {
   echo "https://launchpad.net/ubuntu/+archive/primary/+sourcefiles/webkit2gtk/${version}/webkit2gtk_${upstream}.orig.tar.xz"
 }
 
-debian_pool_debian_tar_url() {
-  local version="$1"
-  echo "http://deb.debian.org/debian/pool/main/w/webkit2gtk/webkit2gtk_${version}.debian.tar.xz"
-  echo "http://deb.debian.org/debian-security/pool/updates/main/w/webkit2gtk/webkit2gtk_${version}.debian.tar.xz"
+curl_https() {
+  local url="$1" dest="$2"
+  curl -fsSL --proto '=https' --proto-redir '=https' "$url" -o "$dest"
 }
 
-debian_pool_orig_tar_url() {
-  local version="$1"
-  local upstream="${version%%-*}"
-  echo "http://deb.debian.org/debian/pool/main/w/webkit2gtk/webkit2gtk_${upstream}.orig.tar.xz"
-  echo "http://deb.debian.org/debian-security/pool/updates/main/w/webkit2gtk/webkit2gtk_${upstream}.orig.tar.xz"
+DEBIAN_SOURCE_DOWNLOADS=""
+
+cleanup_debian_source_downloads() {
+  [[ -n "$DEBIAN_SOURCE_DOWNLOADS" ]] && rm -rf "$DEBIAN_SOURCE_DOWNLOADS"
+  return 0
+}
+trap cleanup_debian_source_downloads EXIT
+
+# Signed apt download of webkit2gtk for a Debian series, once per series and
+# version per run. The verified dsc, orig and debian tarballs stay in $dir.
+ensure_debian_source_package() {
+  local series="$1" version="$2" dir
+  if [[ -z "$DEBIAN_SOURCE_DOWNLOADS" ]]; then
+    DEBIAN_SOURCE_DOWNLOADS="$(mktemp -d "${TMPDIR:-/tmp}/webkitgtk-debian-source.XXXXXX")"
+  fi
+  dir="$DEBIAN_SOURCE_DOWNLOADS/$series"
+  if [[ "$(cat "$dir/.verified" 2>/dev/null)" != "$version" ]]; then
+    rm -rf "$dir"
+    echo "==> apt-get source -d webkit2gtk=$version ($series, signed Debian archive)"
+    debian_source_apt_download "$series" webkit2gtk "$version" "$dir" || return 1
+    echo "$version" >"$dir/.verified"
+  fi
 }
 
-curl_first_url() {
-  local dest="$1"
-  shift
-  local url
-  for url in "$@"; do
-    echo "==> try $url" >&2
-    if curl -fsSL --globoff "$url" -o "$dest"; then
-      return 0
-    fi
-    rm -f "$dest"
-  done
-  echo "error: none of the URLs could be downloaded" >&2
-  return 1
+copy_debian_source_file() {
+  local series="$1" version="$2" name="$3" dest="$4" dir
+  ensure_debian_source_package "$series" "$version" || return 1
+  dir="$DEBIAN_SOURCE_DOWNLOADS/$series"
+  if [[ ! -f "$dir/$name" ]]; then
+    echo "error: verified source package for $series $version has no $name" >&2
+    return 1
+  fi
+  cp "$dir/$name" "$dest"
 }
 
 download_debian_tar() {
   local series="$1" version="$2" dest="$3"
   if [[ "$series" == "trixie" ]]; then
-    # shellcheck disable=SC2046
-    curl_first_url "$dest" $(debian_pool_debian_tar_url "$version")
+    copy_debian_source_file "$series" "$version" "webkit2gtk_${version#*:}.debian.tar.xz" "$dest"
   else
-    curl -fsSL "$(launchpad_debian_tar_url "$version")" -o "$dest"
+    curl_https "$(launchpad_debian_tar_url "$version")" "$dest"
   fi
 }
 
 download_orig_tar() {
-  local series="$1" version="$2" dest="$3"
+  local series="$1" version="$2" dest="$3" upstream
   if [[ "$series" == "trixie" ]]; then
-    # shellcheck disable=SC2046
-    curl_first_url "$dest" $(debian_pool_orig_tar_url "$version")
+    upstream="${version#*:}"
+    upstream="${upstream%-*}"
+    copy_debian_source_file "$series" "$version" "webkit2gtk_${upstream}.orig.tar.xz" "$dest"
   else
-    curl -fsSL "$(launchpad_orig_tar_url "$version")" -o "$dest"
+    curl_https "$(launchpad_orig_tar_url "$version")" "$dest"
   fi
 }
 

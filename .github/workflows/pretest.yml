@@ -49,7 +49,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: fixtures/
-          key: fixtures-${{ matrix.series }}-${{ hashFiles('.github/pinned-webkit-version', 'patches/webkit-*.patch', 'patches/webkitgtk-variant-suffix.patch', 'scripts/fetch-fixtures.sh', 'scripts/lib/debian-rules-fixture.sh', 'scripts/lib/webkit-source-fixture.sh') }}
+          key: fixtures-${{ matrix.series }}-${{ hashFiles('.github/pinned-webkit-version', 'patches/webkit-*.patch', 'patches/webkitgtk-variant-suffix.patch', 'scripts/fetch-fixtures.sh', 'scripts/lib/debian-rules-fixture.sh', 'scripts/lib/webkit-source-fixture.sh', 'scripts/lib/debian-source-apt.sh') }}
 
       - name: Populate pretest fixtures
         run: |
