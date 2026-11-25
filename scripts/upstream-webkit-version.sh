@@ -14,6 +14,9 @@
 #   UPSTREAM_CURL_RETRIES        curl retry count (default: 4)
 set -euo pipefail
 
+# shellcheck source=scripts/lib/pinned-webkit-version.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/pinned-webkit-version.sh"
+
 SERIES="${1:-resolute}"
 ARCHIVE_BASE="${ARCHIVE_BASE:-http://archive.ubuntu.com/ubuntu}"
 ARCHIVE_SECURITY_BASE="${ARCHIVE_SECURITY_BASE:-}"
@@ -114,13 +117,16 @@ versions_from_sources_url() {
 }
 
 newest_version_from_url() {
-  local url="$1"
+  local url="$1" version
   local -a versions
   mapfile -t versions < <(versions_from_sources_url "$url")
   if ((${#versions[@]} == 0)); then
     echo "error: $PACKAGE not found in $url" >&2
     return 1
   fi
+  for version in "${versions[@]}"; do
+    require_valid_webkit_version "$version" "$PACKAGE in $url" || return 1
+  done
   printf '%s\n' "${versions[@]}" | sort -V | tail -n 1
 }
 
@@ -141,6 +147,10 @@ version_from_index() {
     last_modified="$(index_last_modified "$url" || true)"
     cached_lm="$(read_cache_entry "$cache_path" last_modified || true)"
     cached_version="$(read_cache_entry "$cache_path" version || true)"
+    if [[ -n "$cached_version" ]] && ! valid_webkit_version "$cached_version"; then
+      echo "warning: ignoring invalid cached $PACKAGE version for $pocket" >&2
+      cached_version=""
+    fi
 
     if [[ -z "$last_modified" ]]; then
       if [[ -n "$cached_version" ]]; then
@@ -157,7 +167,7 @@ version_from_index() {
       return 0
     fi
 
-    version="$(newest_version_from_url "$url")"
+    version="$(newest_version_from_url "$url")" || return 1
     write_cache_entry "$cache_path" "$last_modified" "$version"
     echo "$version"
     return 0
@@ -189,4 +199,6 @@ if ((${#versions[@]} == 0)); then
   exit 1
 fi
 
-printf '%s\n' "${versions[@]}" | sort -V | tail -n 1
+newest="$(printf '%s\n' "${versions[@]}" | sort -V | tail -n 1)"
+require_valid_webkit_version "$newest" "$PACKAGE for series=$SERIES"
+echo "$newest"

@@ -2,6 +2,25 @@
 # Read/write .github/pinned-webkit-version for a SERIES.
 # Updated automatically by monitor-upstream-build.sh to match archive upstream.
 
+# One Debian version (optional epoch, upstream, optional revision). Versions end
+# up in the pin file, apt requests, file names and git tags, so anything else
+# (slashes, whitespace, several versions) is refused.
+valid_webkit_version() {
+  local version="$1"
+  [[ "$version" =~ ^([0-9]+:)?[0-9][A-Za-z0-9.+~-]*$ && "$version" != *- ]] || return 1
+  if command -v dpkg >/dev/null 2>&1; then
+    dpkg --validate-version "$version" >/dev/null 2>&1 || return 1
+  fi
+}
+
+require_valid_webkit_version() {
+  local version="$1" context="${2:-webkit2gtk}"
+  if ! valid_webkit_version "$version"; then
+    echo "error: $context: not a single Debian version: $(printf '%q' "$version")" >&2
+    return 1
+  fi
+}
+
 pinned_webkit_version_file() {
   if [[ -n "${PINNED_WEBKIT_VERSION_FILE:-}" ]]; then
     echo "$PINNED_WEBKIT_VERSION_FILE"
@@ -28,6 +47,7 @@ read_pinned_webkit_version() {
       version="${version#"${version%%[![:space:]]*}"}"
       version="${version%"${version##*[![:space:]]}"}"
       if [[ -n "$version" ]]; then
+        require_valid_webkit_version "$version" "pinned version for series=$series in $file" || return 1
         echo "$version"
         return 0
       fi
@@ -40,6 +60,7 @@ read_pinned_webkit_version() {
 
 write_pinned_webkit_version() {
   local series="$1" version="$2" file tmp found=0
+  require_valid_webkit_version "$version" "refusing to pin series=$series" || return 1
   file="$(pinned_webkit_version_file)"
   [[ -f "$file" ]] || {
     echo "error: missing pinned webkit version file: $file" >&2
