@@ -39,7 +39,7 @@ run_pretest() {
     echo "==> installing pretest deps"
     sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq
     sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-      devscripts debhelper fakeroot zstd binutils-gold curl
+      devscripts debhelper fakeroot zstd binutils-gold curl debian-archive-keyring
   fi
   REFRESH=1 SERIES="$series" "$REPO_ROOT/scripts/run-pretest.sh" "$series"
 }
